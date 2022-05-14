@@ -2,9 +2,10 @@
 
 import tensorflow as tf
 import time
+import datetime
 
-from config import FILTERS, NUM_BLOCKS, DIM_PER_HEAD, DATA_SIZE, EPOCHS, PAPR_LAMBDA, PWR_LAMBDA, TRAIN_SNRDB
-from models.model import VitCommNet, VitCommNet_Encoder_Only
+from config import *
+from models.model import VitCommNet, VitCommNet_Encoder_Only, CnnCommNet
 from utils.datasets import dataset_generator
 # Reference: https://www.tensorflow.org/tutorials/quickstart/advanced?hl=ko
 
@@ -31,29 +32,39 @@ test_loss = tf.keras.metrics.Mean(name='test_loss')
 normalize = tf.keras.layers.experimental.preprocessing.Rescaling(1./255)
 augment_layer = tf.keras.Sequential([
       tf.keras.layers.experimental.preprocessing.Rescaling(1./255),
-      tf.keras.layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
-      # tf.keras.layers.experimental.preprocessing.RandomZoom(0.3),
-      # tf.keras.layers.experimental.preprocessing.RandomRotation(0.3),
-      tf.keras.layers.experimental.preprocessing.RandomContrast(0.3),
+      tf.keras.layers.experimental.preprocessing.RandomFlip("horizontal"),
+      tf.keras.layers.experimental.preprocessing.RandomRotation(0.1)
   ])
 
 def normalize_and_augment(image, training):
   image = augment_layer(image, training=training)
-
-  # random R/G/B channel value shift
-  b = image.shape[0]
-  if b is None:
-    b = 1
-  
-  image = image + tf.random.normal((b, 1, 1, 3), mean=0.0, stddev=0.1)
-  image = tf.clip_by_value(image, 0, 1)
-
   return image
 
+train_ds = train_ds.shuffle(50000, reshuffle_each_iteration=True)
 train_ds = train_ds.map(lambda x, y: (normalize_and_augment(x, training=True), y), num_parallel_calls=tf.data.experimental.AUTOTUNE)
 test_ds = test_ds.map(lambda x, y: (normalize(x), y))
 
 # %%
+'''
+model = CnnCommNet(
+  FILTERS,
+  NUM_BLOCKS,
+  DATA_SIZE,
+  snrdB=TRAIN_SNRDB,
+  channel=TRAIN_CHANNEL
+)
+model.load_weights('./model_checkpoints/cnn-finetune-at-0dB.ckpt')
+'''
+model_trained = VitCommNet(
+  FILTERS,
+  NUM_BLOCKS,
+  DIM_PER_HEAD,
+  512,
+  snrdB=TRAIN_SNRDB,
+  channel=TRAIN_CHANNEL
+)
+model_trained.load_weights('./model_checkpoints/data-512.ckpt')
+model_trained.build(input_shape=(1, 32, 32, 3))
 
 model = VitCommNet(
   FILTERS,
@@ -61,20 +72,32 @@ model = VitCommNet(
   DIM_PER_HEAD,
   DATA_SIZE,
   snrdB=TRAIN_SNRDB,
-  channel='Rayleigh'
+  channel=TRAIN_CHANNEL
 )
+model.build(input_shape=(1, 32, 32, 3))
 
+model.layers[0].res0.set_weights(model_trained.layers[0].res0.get_weights())
+model.layers[0].res1.set_weights(model_trained.layers[0].res1.get_weights())
+model.layers[0].vit2.set_weights(model_trained.layers[0].vit2.get_weights())
+model.layers[0].vit3.set_weights(model_trained.layers[0].vit3.get_weights())
+
+model.layers[2].vit4.layers[1].set_weights(model_trained.layers[2].vit4.layers[1].get_weights())
+model.layers[2].vit4.layers[2].set_weights(model_trained.layers[2].vit4.layers[2].get_weights())
+
+model.layers[2].res5.set_weights(model_trained.layers[2].res5.get_weights())
+model.layers[2].res6.set_weights(model_trained.layers[2].res6.get_weights())
+model.layers[2].to_image.set_weights(model_trained.layers[2].to_image.get_weights())
+
+'''
 model_encoder = VitCommNet_Encoder_Only(
   FILTERS,
   NUM_BLOCKS,
   DIM_PER_HEAD,
   DATA_SIZE,
   snrdB=TRAIN_SNRDB,
-  channel='Rayleigh'
+  channel=TRAIN_CHANNEL
 )
 
-model.load_weights('./MSE_0.004633.ckpt')
-'''
 ckpts = './PWR_0.006532.ckpt'
 model.load_weights(ckpts)
 model_encoder.load_weights(ckpts)
@@ -111,6 +134,11 @@ def test_step(images):
 
   test_loss(t_loss)
 
+current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+train_log_dir = 'logs/' + current_time + '/train'
+test_log_dir = 'logs/' + current_time + '/test'
+train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
 lowest_loss = 100
 
@@ -144,6 +172,16 @@ for epoch in range(1, EPOCHS+1):
     f'Training time: {(time.time() - start_time)/60:.2f}m, '
     f'Learning rate: {lr}'
   )
+
+  with train_summary_writer.as_default():
+    tf.summary.image("Training data input", images[:10], max_outputs=10, step=0)
+    tf.summary.image("Training data output", model(images[:10]), max_outputs=10, step=0)
+    tf.summary.scalar('loss', train_loss.result(), step=epoch)
+
+  with test_summary_writer.as_default():
+    tf.summary.image("Test data input", test_images[:10], max_outputs=10, step=0)
+    tf.summary.image("Test data output", model(test_images[:10]), max_outputs=10, step=0)
+    tf.summary.scalar('loss', test_loss.result(), step=epoch)
 
   # best model save
   if test_loss.result() < lowest_loss:

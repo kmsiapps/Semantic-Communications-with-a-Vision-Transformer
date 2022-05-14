@@ -3,7 +3,7 @@ import os
 import csv
 
 from config import FILTERS, NUM_BLOCKS, DIM_PER_HEAD, DATA_SIZE, BATCH_SIZE
-from models.model import VitCommNet, VitCommNet_Encoder_Only
+from models.model import VitCommNet, VitCommNet_Encoder_Only, CnnCommNet
 from models.qam_model import QAMModem
 from utils.datasets import dataset_generator
 
@@ -34,7 +34,15 @@ test_loss = tf.keras.metrics.Mean(name='test_loss')
 
 normalization_layer = tf.keras.layers.experimental.preprocessing.Rescaling(1./255)
 test_ds = test_ds.map(lambda x, y: (normalization_layer(x), y))
-
+'''
+model = CnnCommNet(
+  FILTERS,
+  NUM_BLOCKS,
+  DATA_SIZE,
+  snrdB=25,
+  channel='Rayleigh'
+)
+'''
 model = VitCommNet(
   FILTERS,
   NUM_BLOCKS,
@@ -43,18 +51,19 @@ model = VitCommNet(
   snrdB=25,
   channel='Rayleigh'
 )
+
 model.build(input_shape=(1,32,32,3))
 model.summary()
 
 ################## CONFIG ####################
-best_model = './MAE_0.047384.ckpt'
+best_model = './model_checkpoints/data-256.ckpt'
 QAM_ORDER = 256
 ##############################################
 
 for channelname in ['Rayleigh', 'AWGN']:
     f = open(f'./results/{channelname.lower()}_results.csv', 'w', newline='')
     writer = csv.writer(f)
-    writer.writerow(['SNR', 'PropSSIM', 'PropMSE', 'QAMSSIM', 'QAMMSE'])
+    writer.writerow(['SNR', 'PropSSIM', 'PropMSE', 'PropPSNR', 'QAMSSIM', 'QAMMSE', 'QAMPSNR'])
 
     if not os.path.isdir('./results'):
         os.mkdir('./results')
@@ -64,6 +73,15 @@ for channelname in ['Rayleigh', 'AWGN']:
     
     for EVAL_SNRDB in [0, 2.69, 5, 10, 15, 20, 25, 30, 35, 40, 45]:
         qam_modem = QAMModem(snrdB=EVAL_SNRDB, order=QAM_ORDER, channel=channelname)
+        '''
+        model = CnnCommNet(
+            FILTERS,
+            NUM_BLOCKS,
+            DATA_SIZE,
+            snrdB=EVAL_SNRDB,
+            channel=channelname
+            )
+        '''
         model = VitCommNet(
             FILTERS,
             NUM_BLOCKS,
@@ -72,6 +90,7 @@ for channelname in ['Rayleigh', 'AWGN']:
             snrdB=EVAL_SNRDB,
             channel=channelname
             )
+
         model.load_weights(best_model)
 
         i = 0
@@ -116,7 +135,7 @@ for channelname in ['Rayleigh', 'AWGN']:
         print(f'MSE:  (Proposed){mse_props:.6f} vs. (QAM){mse_qams:.6f}')
         print(f'PSNR:  (Proposed){psnr_props:.6f} vs. (QAM){psnr_qams:.6f}')
 
-        writer.writerow([EVAL_SNRDB, float(ssim_props), float(mse_props), float(ssim_qams), float(mse_qams)])
+        writer.writerow([EVAL_SNRDB, float(ssim_props), float(mse_props), float(psnr_props), float(ssim_qams), float(mse_qams), float(psnr_qams)])
     '''
     # Layer-wise image
     images, _ = next(iter(test_ds))

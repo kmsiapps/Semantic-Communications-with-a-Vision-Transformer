@@ -10,7 +10,7 @@ import os
 import csv
 
 from config import FILTERS, NUM_BLOCKS, DIM_PER_HEAD, DATA_SIZE, BATCH_SIZE
-from models.model import VitCommNet, VitCommNet_Encoder_Only
+from models.model import VitCommNet, VitCommNet_Encoder_Only, CnnCommNet_Encoder_Only
 from models.qam_model import QAMModem
 from utils.datasets import dataset_generator
 
@@ -19,12 +19,20 @@ normalization_layer = tf.keras.layers.experimental.preprocessing.Rescaling(1./25
 test_ds = test_ds.map(lambda x, y: (normalization_layer(x), y))
 
 ################## CONFIG ####################
-best_model = './MAE_0.047384.ckpt'
+best_model = './model_checkpoints/data-1024.ckpt'
 ##############################################
 
 # Layer-wise image
 images, _ = next(iter(test_ds))
-
+'''
+model = CnnCommNet_Encoder_Only(
+  FILTERS,
+  NUM_BLOCKS,
+  DATA_SIZE,
+  snrdB=10,
+  channel='Rayleigh'
+)
+'''
 model = VitCommNet_Encoder_Only(
     FILTERS,
     NUM_BLOCKS,
@@ -33,6 +41,7 @@ model = VitCommNet_Encoder_Only(
     snrdB=10,
     channel='Rayleigh'
     )
+
 model.load_weights(best_model)
 
 constellation = model(images)
@@ -59,7 +68,9 @@ q = q / power
 papr = np.max(i ** 2 + q ** 2) / np.mean(i ** 2 + q ** 2)
 print(papr)
 
-plt.scatter(i[:], q[:], s=0.1)
+plt.scatter(i, q, s=0.01)
 plt.show()
+
+# %%
 
 # %%
