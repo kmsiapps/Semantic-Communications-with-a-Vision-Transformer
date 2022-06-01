@@ -3,7 +3,7 @@ import tensorflow_datasets as tfds
 
 from config import BATCH_SIZE
 
-def dataset_generator(dir, mode=None):
+def dataset_generator(dir, mode=None, shuffle=True):
     if mode:
         dataset = image_dataset_from_directory(
             directory=dir,
@@ -12,7 +12,7 @@ def dataset_generator(dir, mode=None):
             color_mode='rgb',
             batch_size=BATCH_SIZE,
             image_size=(32, 32),
-            shuffle=True,
+            shuffle=shuffle,
             interpolation='bilinear',
             validation_split=0.1,
             subset=mode,
@@ -26,7 +26,7 @@ def dataset_generator(dir, mode=None):
             color_mode='rgb',
             batch_size=BATCH_SIZE,
             image_size=(32, 32),
-            shuffle=True,
+            shuffle=shuffle,
             interpolation='bilinear'
         )
 

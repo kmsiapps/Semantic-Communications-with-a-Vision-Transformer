@@ -1,2 +1,2 @@
-model_checkpoint_path: "decoder-512.ckpt"
-all_model_checkpoint_paths: "decoder-512.ckpt"
+model_checkpoint_path: "epoch_174.ckpt"
+all_model_checkpoint_paths: "epoch_174.ckpt"

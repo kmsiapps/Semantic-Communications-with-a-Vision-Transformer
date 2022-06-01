@@ -5,9 +5,10 @@ import struct
 import matplotlib.pyplot as plt
 import numpy as np
 from pilot import p_start, p_end, PILOT_SIZE, SAMPLE_SIZE
+from time import sleep
 
 send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-send_addr = ("192.168.1.121", 60000)
+send_addr = ("192.168.0.2", 60000)
 SEND_SOCK_BUFF_SIZE = 256
 
 # while True:
@@ -20,14 +21,15 @@ rcv_data = bytes()
 _data = bytes()
 
 x = np.linspace(0, 4 * 2 * np.pi, SAMPLE_SIZE - 2*PILOT_SIZE)
-i = 1 * np.ones(x.size) * 32767 # np.cos(x) * 32767
-q = 1 * np.sin(x) * 32767 # np.ones(x.size) * 32767 # np.sin(x) * 32767
+i = 1 * np.cos(x) * 32767 # 0 * np.ones(x.size) * 32767 # np.cos(x) * 32767
+q = 1 * np.sin(x) * 32767 # 0.0 * np.ones(x.size) * 32767 # np.sin(x) * 32767
 
 zero_pilot = np.zeros(len(p_start))
 
 p_i = np.concatenate([p_start, i, p_end]).astype(np.int16)
 # p_i = np.concatenate([zero_pilot, i, zero_pilot]).astype(np.int16)
 p_q = np.concatenate([p_start, q, p_end]).astype(np.int32)
+# p_q = np.concatenate([zero_pilot, q, zero_pilot]).astype(np.int32)
 
 # Q is in the higher bits!
 i_ = p_i

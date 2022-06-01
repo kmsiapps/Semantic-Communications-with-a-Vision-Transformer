@@ -60,7 +60,7 @@ best_model = './model_checkpoints/data-256.ckpt'
 QAM_ORDER = 256
 ##############################################
 
-for channelname in ['Rayleigh', 'AWGN']:
+for channelname in ['AWGN']:
     f = open(f'./results/{channelname.lower()}_results.csv', 'w', newline='')
     writer = csv.writer(f)
     writer.writerow(['SNR', 'PropSSIM', 'PropMSE', 'PropPSNR', 'QAMSSIM', 'QAMMSE', 'QAMPSNR'])
@@ -116,7 +116,7 @@ for channelname in ['Rayleigh', 'AWGN']:
                 tf.keras.utils.save_img(f'./results/{channelname}/proposed_SNR{EVAL_SNRDB}.png', imBatchtoImage(prop_results))
                 tf.keras.utils.save_img(f'./results/{channelname}/256qam_SNR{EVAL_SNRDB}.png', imBatchtoImage(qam_results))
             
-            if i == 9:
+            if i == 2:
                 break
 
             i += 1

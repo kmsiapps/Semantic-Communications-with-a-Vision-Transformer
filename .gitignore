@@ -1,4 +1,5 @@
 __pycache__/
 datasets/
 model_checkpoints/
-results/
+results/**
+logs/**

@@ -9,8 +9,10 @@ from models.model import VitCommNet, VitCommNet_Encoder_Only, CnnCommNet
 from utils.datasets import dataset_generator
 # Reference: https://www.tensorflow.org/tutorials/quickstart/advanced?hl=ko
 
-test_ds = dataset_generator('/dataset/CIFAR10/test/').cache().prefetch(tf.data.experimental.AUTOTUNE)
-train_ds = dataset_generator('/dataset/CIFAR10/train/').cache().prefetch(tf.data.experimental.AUTOTUNE)
+# test_ds = dataset_generator('/dataset/CIFAR10/test/').cache().prefetch(tf.data.experimental.AUTOTUNE)
+# train_ds = dataset_generator('/dataset/CIFAR10/train/').cache().prefetch(tf.data.experimental.AUTOTUNE)
+test_ds = dataset_generator('/dataset/KODAK_PATCH', mode='validation').cache().prefetch(tf.data.experimental.AUTOTUNE)
+train_ds = dataset_generator('/dataset/KODAK_PATCH', mode='training').cache().prefetch(tf.data.experimental.AUTOTUNE)
 
 loss_object = tf.keras.losses.MeanSquaredError() # MeanAbsoluteError() # MeanSquaredError()
 
@@ -45,6 +47,7 @@ train_ds = train_ds.map(lambda x, y: (normalize_and_augment(x, training=True), y
 test_ds = test_ds.map(lambda x, y: (normalize(x), y))
 
 # %%
+
 '''
 model = CnnCommNet(
   FILTERS,
@@ -53,7 +56,8 @@ model = CnnCommNet(
   snrdB=TRAIN_SNRDB,
   channel=TRAIN_CHANNEL
 )
-model.load_weights('./model_checkpoints/cnn-finetune-at-0dB.ckpt')
+model.load_weights('./model_checkpoints/data-512.ckpt')
+'''
 '''
 model_trained = VitCommNet(
   FILTERS,
@@ -65,7 +69,7 @@ model_trained = VitCommNet(
 )
 model_trained.load_weights('./model_checkpoints/data-512.ckpt')
 model_trained.build(input_shape=(1, 32, 32, 3))
-
+'''
 model = VitCommNet(
   FILTERS,
   NUM_BLOCKS,
@@ -75,7 +79,9 @@ model = VitCommNet(
   channel=TRAIN_CHANNEL
 )
 model.build(input_shape=(1, 32, 32, 3))
+model.load_weights('./model_checkpoints/data-512.ckpt')
 
+'''
 model.layers[0].res0.set_weights(model_trained.layers[0].res0.get_weights())
 model.layers[0].res1.set_weights(model_trained.layers[0].res1.get_weights())
 model.layers[0].vit2.set_weights(model_trained.layers[0].vit2.get_weights())
@@ -87,6 +93,7 @@ model.layers[2].vit4.layers[2].set_weights(model_trained.layers[2].vit4.layers[2
 model.layers[2].res5.set_weights(model_trained.layers[2].res5.get_weights())
 model.layers[2].res6.set_weights(model_trained.layers[2].res6.get_weights())
 model.layers[2].to_image.set_weights(model_trained.layers[2].to_image.get_weights())
+'''
 
 '''
 model_encoder = VitCommNet_Encoder_Only(
@@ -150,19 +157,19 @@ for epoch in range(1, EPOCHS+1):
 
   one_test_step_time = time.time()
   i = 0
-  TIME_ESTIMATION_IDX = len(train_ds) // 100
+  TIME_ESTIMATION_IDX = len(train_ds) // 10
   for images, labels in train_ds:
       train_step(images)
-      if i == TIME_ESTIMATION_IDX:
-          print(f'Estimated train epoch time: {len(train_ds) * (time.time() - one_test_step_time) / TIME_ESTIMATION_IDX / 60:.2f} minutes')
+      # if i == TIME_ESTIMATION_IDX:
+      #     print(f'Estimated train epoch time: {len(train_ds) * (time.time() - one_test_step_time) / TIME_ESTIMATION_IDX / 60:.2f} minutes')
       i += 1
 
   one_test_step_time = time.time()
   i = 0
   for test_images, test_labels in test_ds:
       test_step(test_images)
-      if i == TIME_ESTIMATION_IDX:
-          print(f'Estimated test epoch time: {len(test_ds) * (time.time() - one_test_step_time) / TIME_ESTIMATION_IDX / 60:.2f} minutes')
+      # if i == TIME_ESTIMATION_IDX:
+      #     print(f'Estimated test epoch time: {len(test_ds) * (time.time() - one_test_step_time) / TIME_ESTIMATION_IDX / 60:.2f} minutes')
       i += 1
 
   print(

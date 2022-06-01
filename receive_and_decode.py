@@ -7,10 +7,11 @@ import PIL.Image as pilimg
 import numpy as np
 import math
 import tensorflow as tf
+import time
 
 from pilot import p_start, p_end, PILOT_SIZE, SAMPLE_SIZE
 from models.model import VitCommNet_Encoder_Only, VitCommNet_Decoder_Only
-from config import FILTERS, NUM_BLOCKS, DIM_PER_HEAD, DATA_SIZE, BATCH_SIZE
+from config import FILTERS, NUM_BLOCKS, DIM_PER_HEAD
 
 rcv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 rcv_addr = ("0.0.0.0", 50000)
@@ -18,24 +19,8 @@ rcv_sock.bind(rcv_addr)
 
 rcv_sock.settimeout(2)
 
-EXPECTED_DATA_LENGTH = 4096 * 2
 SOCK_BUFF_SIZE = 16384 # EXPECTED_DATA_LENGTH * 4 + 4
-
 EXPECTED_SAMPLE_SIZE = SAMPLE_SIZE - PILOT_SIZE * 2
-
-images = pilimg.open('./results/source.png').convert('RGB')
-images = tf.convert_to_tensor(images, dtype=tf.float32) / 255.0
-h, w, c = images.shape
-images = tf.reshape(images, (1, h, w, c))
-
-images = tf.image.extract_patches(
-    images,
-    sizes=[1, 32, 32, 1],
-    strides=[1, 32, 32, 1],
-    rates=[1, 1, 1, 1],
-    padding='VALID'
-)
-images = tf.reshape(images, (-1, 32, 32, c))
 
 encoder_network = VitCommNet_Encoder_Only(
 FILTERS,
@@ -55,9 +40,8 @@ decoder_network = VitCommNet_Decoder_Only(
     channel='Rayleigh'
 )
 
-# best_model = './model_checkpoints/data-512.ckpt' #'./model_checkpoints/data-512.ckpt'
-encoder_network.load_weights('./model_checkpoints/encoder-512.ckpt')
-decoder_network.load_weights('./model_checkpoints/decoder-512.ckpt')
+encoder_network.load_weights('epoch_174.ckpt') #'./model_checkpoints/encoder-512.ckpt')
+decoder_network.load_weights('epoch_174.ckpt') #'./model_checkpoints/decoder-512.ckpt')
 
 @tf.function
 def imBatchtoImage(batch_images):
@@ -76,18 +60,7 @@ def imBatchtoImage(batch_images):
     image = tf.reshape(image, (-1, batch//divisor*w, c))
     return image
 
-gt = encoder_network(images)
-gt_i = tf.reshape(gt[0], shape=(-1,))
-gt_q = tf.reshape(gt[1], shape=(-1,))
-
-# while True:
-#     try:
-#         _, _ = rcv_sock.recvfrom(SOCK_BUFF_SIZE)
-#     except socket.timeout:
-#         break
-
 #%%
-
 rcv_data = bytes()
 _data = bytes()
 
@@ -106,9 +79,31 @@ while True:
             ARRAY_END = array_length * 4 + 4
             read_header = True
         rcv_data += _data
-        # print(f"RCV: {len(rcv_data)}/{ARRAY_END} (+{len(_data)})", end='')
+        print(f"RCV: {len(rcv_data)}/{ARRAY_END} (+{len(_data)})", end='')
         
         if len(rcv_data) >= ARRAY_END:
+            # for manual image
+            images = pilimg.open('./results/source.png').convert('RGB')
+            images = tf.convert_to_tensor(images, dtype=tf.float32) / 255.0
+            h, w, c = images.shape
+            images = tf.reshape(images, (1, h, w, c))
+
+            images = tf.image.extract_patches(
+                images,
+                sizes=[1, 32, 32, 1],
+                strides=[1, 32, 32, 1],
+                rates=[1, 1, 1, 1],
+                padding='VALID'
+            )
+            images = tf.reshape(images, (-1, 32, 32, c))
+
+            encoding_delay = time.time()
+            gt = encoder_network(images)
+            encoding_delay = time.time() - encoding_delay
+
+            gt_i = tf.reshape(gt[0], shape=(-1,))
+            gt_q = tf.reshape(gt[1], shape=(-1,))
+
             data = rcv_data[4:ARRAY_END]
             d_iq = struct.unpack('!' + 'f' * array_length, data)
 
@@ -116,9 +111,10 @@ while True:
             raw_q = np.array(d_iq[array_length // 2:])
 
             # Leakage compensation
-            LC = 1 # Leakage ratio constant
-            i_compensated = (raw_i - LC * raw_q) / (1+LC**2)
-            q_compensated = (raw_q + LC * raw_i) / (1+LC**2) / 3.5 # magic num
+            LCI = 2.24 # Leakage ratio constant
+            LCQ = 2.5
+            i_compensated = (raw_i - LCI * raw_q) / (1+LCI**2)
+            q_compensated = (raw_q + LCQ * raw_i) / (1+LCQ**2) # / 3.5 # magic num
 
             print()
             print(f"{len(rcv_data)} => ", end='')
@@ -145,7 +141,7 @@ while True:
             p = np.concatenate([p_start, p_end]) / 32767
             nonzero_idx = np.where(p != 0)
             hi = np.sum(np.divide(p_rx[nonzero_idx], p[nonzero_idx])) / len(p[nonzero_idx])
-            hi *= 1.15 # magic num
+            hi *= 3.0 # 1.15 # magic num
 
             i_compensated /= hi
 
@@ -153,9 +149,9 @@ while True:
             ihat = i_compensated[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]
             signal_power = np.sum((ihat * hi) ** 2) / len(ihat)
 
-            plt.title('Decoded In-phase signal\n(h & n compensated)')
-            plt.plot(ihat)
-            plt.show()
+            # plt.title('Decoded In-phase signal\n(h & n compensated)')
+            # plt.plot(ihat)
+            # plt.show()
 
             # Quadrature phase detection =================
             pilot_mask = np.concatenate([p_start, np.zeros(EXPECTED_SAMPLE_SIZE), p_end])
@@ -177,30 +173,19 @@ while True:
             p = np.concatenate([p_start, p_end]) / 32767
             nonzero_idx = np.where(p != 0)
             hq = np.sum(np.divide(p_rx[nonzero_idx], p[nonzero_idx])) / len(p[nonzero_idx])
-            hq *= 1.15 # magic num
+            hq *= 2.5 # 1.15 # magic num
 
             q_compensated /= hq
 
             # get data
             qhat = q_compensated[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]
 
-            plt.title('Decoded Quadrature-phase signal\n(h & n compensated)')
-            plt.plot(qhat)
-            plt.show()
+            # plt.title('Decoded Quadrature-phase signal\n(h & n compensated)')
+            # plt.plot(qhat)
+            # plt.show()
 
-            plt.title('Raw I/Q')
-            plt.plot(raw_i)# [start_idx-PILOT_SIZE*2:start_idx+EXPECTED_SAMPLE_SIZE+PILOT_SIZE*2])
-            plt.plot(raw_q)# [start_idx-PILOT_SIZE*2:start_idx+EXPECTED_SAMPLE_SIZE+PILOT_SIZE*2])
-            plt.show()
-
-            max_i = 80 # float(input('max_i?'))
-            max_q = 80 # float(input('max_q?'))
-
-            plt.title('Received Constallations')
-            plt.scatter(ihat, qhat, s=0.01)
-            plt.xlim([-1, 1])
-            plt.ylim([-1, 1])
-            plt.show()
+            max_i = 80
+            max_q = 80
 
             rcv_iq = np.zeros(shape=(2, len(ihat)))
             rcv_iq[0, :] = ihat * max_i
@@ -212,15 +197,32 @@ while True:
             proposed_result = decoder_network(rcv_iq)
             tf.keras.utils.save_img(f'./results/proposed_usrp.png', imBatchtoImage(proposed_result))
 
+            decoding_delay = time.time()
             non_error_result = decoder_network(gt)
+            decoding_delay = time.time() - decoding_delay
+
             tf.keras.utils.save_img(f'./results/proposed_gt.png', imBatchtoImage(non_error_result))
 
             err_i = gt_i/max_i - ihat
             err_q = gt_q/max_q - qhat
 
-            plt.title('Error')
-            plt.plot(err_i)
-            plt.plot(err_q)
+            fig, ax = plt.subplots(1, 3)
+            fig.set_figheight(4)
+            fig.set_figwidth(21)
+            
+            ax[0].set_title('Raw I/Q')
+            ax[0].plot(raw_i)
+            ax[0].plot(raw_q)
+
+            ax[1].set_title('Error')
+            ax[1].plot(err_i)
+            ax[1].plot(err_q)
+
+            ax[2].set_title('Decded I/Q')
+            ax[2].plot(ihat)
+            ax[2].plot(qhat)
+
+            fig.tight_layout()
             plt.show()
 
             signal_power = np.mean(ihat ** 2 + qhat ** 2)
@@ -228,17 +230,41 @@ while True:
             snr = signal_power / noise_power
             snrdB = 10 * math.log10(snr)
 
-            print(f"Effective SNR: {snrdB:.2f}dB")
+            fig, ax = plt.subplots(1, 3)
+            fig.set_figheight(7)
+            fig.set_figwidth(21)
+            
+            ax[0].set_title('Original')
+            ax[0].imshow(imBatchtoImage(images).numpy())
 
             psnr = np.mean(tf.image.psnr(images, proposed_result, max_val=1.0))
-            print(f"Image PSNR (averaged over patches): {psnr:.2f} dB")
+            ssim = np.mean(tf.image.ssim(images, proposed_result, max_val=1.0))
+            ax[1].set_title(f'Proposed\nPSNR: {psnr:.2f} dB\nSSIM: {ssim:.2f}')
+            ax[1].imshow(imBatchtoImage(proposed_result).numpy())
+            
+            image_jpeg = pilimg.open('./results/source_jpeg.jpg').convert('RGB')
+            image_jpeg = tf.convert_to_tensor(image_jpeg, dtype=tf.float32) / 255.0
+            h, w, c = image_jpeg.shape
+            image_jpeg = tf.reshape(image_jpeg, (1, h, w, c))
+            image_jpeg = tf.image.extract_patches(
+                image_jpeg,
+                sizes=[1, 32, 32, 1],
+                strides=[1, 32, 32, 1],
+                rates=[1, 1, 1, 1],
+                padding='VALID'
+            )
+            image_jpeg = tf.reshape(image_jpeg, (-1, 32, 32, c))
 
+            psnr = np.mean(tf.image.psnr(images, image_jpeg, max_val=1.0))
+            ssim = np.mean(tf.image.ssim(images, image_jpeg, max_val=1.0))
+            ax[2].set_title(f'Conventional (JPEG-based)\nPSNR: {psnr:.2f} dB\nSSIM: {ssim:.2f}')
+            ax[2].imshow(imBatchtoImage(image_jpeg).numpy())
 
+            plt.show()
 
-# i = decoded_data[0::2]
-# q = decoded_data[1::2]
+            print(f"Encoding time: {encoding_delay:.2f}s, Decoding time: {decoding_delay:.2f}s")
+            print(f"Effective SNR: {snrdB:.2f}dB")
 
-plt.plot(range(len(decoded_data)), decoded_data)
-plt.show()
+            rcv_data = bytes()
 
 # %%
