@@ -1,18 +1,55 @@
 # %%
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
 
 import tensorflow as tf
 import time
 import datetime
+import argparse
 
-from config import *
-from models.model import VitCommNet, VitCommNet_Encoder_Only, CnnCommNet
+from config import BATCH_SIZE, TRAIN_CHANNEL
+from models.model import SemVit
 from utils.datasets import dataset_generator
 # Reference: https://www.tensorflow.org/tutorials/quickstart/advanced?hl=ko
 
-# test_ds = dataset_generator('/dataset/CIFAR10/test/').cache().prefetch(tf.data.experimental.AUTOTUNE)
-# train_ds = dataset_generator('/dataset/CIFAR10/train/').cache().prefetch(tf.data.experimental.AUTOTUNE)
-test_ds = dataset_generator('/dataset/KODAK_PATCH', mode='validation').cache().prefetch(tf.data.experimental.AUTOTUNE)
-train_ds = dataset_generator('/dataset/KODAK_PATCH', mode='training').cache().prefetch(tf.data.experimental.AUTOTUNE)
+parser = argparse.ArgumentParser()
+parser.add_argument('data_size', type=int, help='total number of complex symbols sent'),
+parser.add_argument('channel_types', type=str, help='channel types. Rayleigh, AWGN, or None'),
+parser.add_argument('train_snrdB', type=int, help='train snr (in dB)'),
+parser.add_argument('block_types', type=str, help='Type of the each block (in a String, total 7). C for conv, V for ViT e.g,. CCVVVCC')
+parser.add_argument('experiment_name',
+                    type=str,
+                    help='experiment name (used for ckpt & logs)')
+parser.add_argument('epochs', type=int, help='total epochs')
+
+parser.add_argument('--filters', nargs='+', help='number of output dimensions for each block', required=True, type=int)
+parser.add_argument('--repetitions', nargs='+', help='repetitions of each block', required=True, type=int)
+
+parser.add_argument('--initial_epoch', type=int, default=0, help='initial epoch')
+parser.add_argument('--dim_per_head', type=int, default=32, help='dimensions per head in ViT blocks')
+parser.add_argument('--papr_reduction', type=str, default=None, help='papr reduction method ("clip" or None)')
+parser.add_argument('--ckpt', type=str, default=None, help='checkpoint file path (optional)')
+
+args = parser.parse_args()
+EXPERIMENT_NAME = args.experiment_name
+epochs = args.epochs
+initial_epoch = args.initial_epoch
+DATA_SIZE = args.data_size
+TRAIN_CHANNEL = args.channel_types
+TRAIN_SNRDB = args.train_snrdB
+FILTERS = args.filters
+NUM_BLOCKS = args.repetitions
+DIM_PER_HEAD = args.dim_per_head
+BLOCK_TYPES = args.block_types
+PAPR_REDUCTION = args.papr_reduction
+
+print(f'Running {EXPERIMENT_NAME}')
+
+test_ds = dataset_generator('/dataset/CIFAR10/test/').cache().prefetch(tf.data.experimental.AUTOTUNE)
+train_ds = dataset_generator('/dataset/CIFAR10/train/').cache().prefetch(tf.data.experimental.AUTOTUNE)
+# test_ds = dataset_generator('/dataset/KODAK_PATCH', mode='validation').cache().prefetch(tf.data.experimental.AUTOTUNE)
+# train_ds = dataset_generator('/dataset/KODAK_PATCH', mode='training').cache().prefetch(tf.data.experimental.AUTOTUNE)
 
 loss_object = tf.keras.losses.MeanSquaredError() # MeanAbsoluteError() # MeanSquaredError()
 
@@ -35,7 +72,7 @@ normalize = tf.keras.layers.experimental.preprocessing.Rescaling(1./255)
 augment_layer = tf.keras.Sequential([
       tf.keras.layers.experimental.preprocessing.Rescaling(1./255),
       tf.keras.layers.experimental.preprocessing.RandomFlip("horizontal"),
-      tf.keras.layers.experimental.preprocessing.RandomRotation(0.1)
+      # tf.keras.layers.experimental.preprocessing.RandomRotation(0.1),
   ])
 
 def normalize_and_augment(image, training):
@@ -48,67 +85,22 @@ test_ds = test_ds.map(lambda x, y: (normalize(x), y))
 
 # %%
 
-'''
-model = CnnCommNet(
-  FILTERS,
-  NUM_BLOCKS,
-  DATA_SIZE,
-  snrdB=TRAIN_SNRDB,
-  channel=TRAIN_CHANNEL
-)
-model.load_weights('./model_checkpoints/data-512.ckpt')
-'''
-'''
-model_trained = VitCommNet(
-  FILTERS,
-  NUM_BLOCKS,
-  DIM_PER_HEAD,
-  512,
-  snrdB=TRAIN_SNRDB,
-  channel=TRAIN_CHANNEL
-)
-model_trained.load_weights('./model_checkpoints/data-512.ckpt')
-model_trained.build(input_shape=(1, 32, 32, 3))
-'''
-model = VitCommNet(
+model = SemVit(
+  BLOCK_TYPES,
   FILTERS,
   NUM_BLOCKS,
   DIM_PER_HEAD,
   DATA_SIZE,
   snrdB=TRAIN_SNRDB,
-  channel=TRAIN_CHANNEL
-)
-model.build(input_shape=(1, 32, 32, 3))
-model.load_weights('./model_checkpoints/data-512.ckpt')
-
-'''
-model.layers[0].res0.set_weights(model_trained.layers[0].res0.get_weights())
-model.layers[0].res1.set_weights(model_trained.layers[0].res1.get_weights())
-model.layers[0].vit2.set_weights(model_trained.layers[0].vit2.get_weights())
-model.layers[0].vit3.set_weights(model_trained.layers[0].vit3.get_weights())
-
-model.layers[2].vit4.layers[1].set_weights(model_trained.layers[2].vit4.layers[1].get_weights())
-model.layers[2].vit4.layers[2].set_weights(model_trained.layers[2].vit4.layers[2].get_weights())
-
-model.layers[2].res5.set_weights(model_trained.layers[2].res5.get_weights())
-model.layers[2].res6.set_weights(model_trained.layers[2].res6.get_weights())
-model.layers[2].to_image.set_weights(model_trained.layers[2].to_image.get_weights())
-'''
-
-'''
-model_encoder = VitCommNet_Encoder_Only(
-  FILTERS,
-  NUM_BLOCKS,
-  DIM_PER_HEAD,
-  DATA_SIZE,
-  snrdB=TRAIN_SNRDB,
-  channel=TRAIN_CHANNEL
+  channel=TRAIN_CHANNEL,
+  papr_reduction=PAPR_REDUCTION
 )
 
-ckpts = './PWR_0.006532.ckpt'
-model.load_weights(ckpts)
-model_encoder.load_weights(ckpts)
-'''
+if args.ckpt is not None:
+  model.load_weights(args.ckpt)
+
+# TODO: PAPR loss 구현
+# TODO: 분산 학습 코드 구현 => 뭔가 문제가 있는듯? 일단 보류
 
 @tf.function
 def train_step(images):
@@ -128,7 +120,6 @@ def train_step(images):
   train_loss(loss)
 
 @tf.function
-
 def test_step(images):
   # constellations = model_encoder(images)
   # i = constellations[0]
@@ -141,15 +132,15 @@ def test_step(images):
 
   test_loss(t_loss)
 
-current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-train_log_dir = 'logs/' + current_time + '/train'
-test_log_dir = 'logs/' + current_time + '/test'
+# current_time = datetime.datetime.now().strftime(f"%Y%m%d-%H%M%S")
+train_log_dir = f'logs/{EXPERIMENT_NAME}/train'
+test_log_dir = f'logs/{EXPERIMENT_NAME}/test'
 train_summary_writer = tf.summary.create_file_writer(train_log_dir)
 test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
 lowest_loss = 100
 
-for epoch in range(1, EPOCHS+1):
+for epoch in range(initial_epoch+1, epochs+1):
   start_time = time.time()
   # Reset the metrics at the start of the next epoch
   train_loss.reset_states()
@@ -193,4 +184,4 @@ for epoch in range(1, EPOCHS+1):
   # best model save
   if test_loss.result() < lowest_loss:
       lowest_loss = float(test_loss.result())
-      model.save_weights(f'epoch_{epoch}.ckpt')
+      model.save_weights(f'./ckpt/{EXPERIMENT_NAME}_{epoch}.ckpt')

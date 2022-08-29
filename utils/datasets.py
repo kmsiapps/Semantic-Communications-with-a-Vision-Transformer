@@ -1,5 +1,4 @@
 from tensorflow.keras.preprocessing import image_dataset_from_directory
-import tensorflow_datasets as tfds
 
 from config import BATCH_SIZE
 

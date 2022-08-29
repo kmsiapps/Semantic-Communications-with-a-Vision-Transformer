@@ -3,7 +3,7 @@ import tensorflow as tf
 # Reference: https://github.com/calmisential/TensorFlow2.0_ResNet/
 
 class ResBlock(tf.keras.layers.Layer):
-    def __init__(self, filter_size, stride=1, is_bottleneck=True):
+    def __init__(self, filter_size, stride=1, kernel_size=5, is_bottleneck=True):
         super().__init__()
         self.bottleneck = is_bottleneck
         self.stride = stride
@@ -17,7 +17,7 @@ class ResBlock(tf.keras.layers.Layer):
         self.bn1 = tf.keras.layers.BatchNormalization()
 
         self.conv2 = tf.keras.layers.Conv2D(filters = filter_size,
-                                            kernel_size = (3, 3),
+                                            kernel_size = (kernel_size, kernel_size),
                                             strides = stride,
                                             padding="same",
                                             kernel_initializer=henorm)

@@ -38,18 +38,8 @@ class RelativeMHSA(tf.keras.layers.Layer):
         self.dim_head = dim_head
         self.num_heads = num_heads
 
-        self.query_transform = tf.keras.layers.Conv2D(
-            filters=dim_head,
-            kernel_size=1
-        )
-
-        self.key_transform = tf.keras.layers.Conv2D(
-            filters=dim_head,
-            kernel_size=1
-        )
-
-        self.value_transform = tf.keras.layers.Conv2D(
-            filters=dim_head,
+        self.qkv = tf.keras.layers.Conv2D(
+            filters=dim_head * 3,
             kernel_size=1
         )
 
@@ -88,11 +78,7 @@ class RelativeMHSA(tf.keras.layers.Layer):
 
 
     def call(self, x):
-        '''
-        input: [q, k, v]
-        '''        
-        q, k, v = x
-        b, h, w, c = q.shape
+        b, h, w, c = x.shape
         m = self.num_heads
 
         assert c % m == 0, "channel dimension should be divisible " \
@@ -100,22 +86,14 @@ class RelativeMHSA(tf.keras.layers.Layer):
         d_h = c//m
 
         # [b, h, w, c] to [b, m, h, w, c//m]
-        q = tf.reshape(q, (-1, h, w, m, d_h))
-        q = tf.transpose(q, (0, 3, 1, 2, 4))
+        x = tf.reshape(x, (-1, h, w, m, d_h))
+        x = tf.transpose(x, (0, 3, 1, 2, 4))
 
-        k = tf.reshape(k, (-1, h, w, m, d_h))
-        k = tf.transpose(k, (0, 3, 1, 2, 4))
-
-        v = tf.reshape(v, (-1, h, w, m, d_h))
-        v = tf.transpose(v, (0, 3, 1, 2, 4))
-
-        q = self.query_transform(q)
-        k = self.key_transform(k)
-        v = self.value_transform(v)
-
-        # flatten query and key
-        q = tf.reshape(q, (b*m, -1, self.dim_head))
-        k = tf.reshape(k, (b*m, -1, self.dim_head))
+        x = self.qkv(x)
+        x = tf.reshape(x, (b*m, h*w, self.dim_head, 3))
+        q = x[:, :, :, 0]
+        k = x[:, :, :, 1]
+        v = x[:, :, :, 2]
 
         # normalize with sqrt(d)
         q = q / tf.sqrt(tf.constant(self.dim_head, tf.float32))
@@ -185,7 +163,7 @@ class VitBlock(tf.keras.layers.Layer):
         x = self.downsample(x)
         x = self.ln1(x)
         x_residual = self.proj(x)
-        x = self.mhsa([x, x, x]) # [q, k, v]
+        x = self.mhsa(x) 
         x = tf.add(x, x_residual)
         
         x_residual = x
