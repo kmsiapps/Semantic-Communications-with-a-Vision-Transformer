@@ -90,7 +90,7 @@ class RelativeMHSA(tf.keras.layers.Layer):
         x = tf.transpose(x, (0, 3, 1, 2, 4))
 
         x = self.qkv(x)
-        x = tf.reshape(x, (b*m, h*w, self.dim_head, 3))
+        x = tf.reshape(x, (-1, h*w, self.dim_head, 3))
         q = x[:, :, :, 0]
         k = x[:, :, :, 1]
         v = x[:, :, :, 2]
@@ -107,13 +107,13 @@ class RelativeMHSA(tf.keras.layers.Layer):
         att_map = att_map + pos_emb
         att_map = tf.nn.softmax(att_map)
         
-        v = tf.reshape(v, (b*m, -1, self.dim_head))
+        v = tf.reshape(v, (-1, h*w, self.dim_head))
         v = tf.einsum('bij,bjc->bic', att_map, v)
 
         # [b, m, h, w, c//m] to [b, h, w, c]
-        v = tf.reshape(v, (b, m, h, w, -1))
+        v = tf.reshape(v, (-1, m, h, w, c//m))
         v = tf.transpose(v, (0, 2, 3, 1, 4))
-        v = tf.reshape(v, (b, h, w, -1))
+        v = tf.reshape(v, (-1, h, w, c))
 
         v = self.head_transform(v)
         return v
@@ -162,7 +162,9 @@ class VitBlock(tf.keras.layers.Layer):
     def call(self, x):
         x = self.downsample(x)
         x = self.ln1(x)
-        x_residual = self.proj(x)
+        x = self.proj(x)
+        x_residual = x
+
         x = self.mhsa(x) 
         x = tf.add(x, x_residual)
         

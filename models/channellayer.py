@@ -58,7 +58,7 @@ class RayleighChannel(tf.keras.layers.Layer):
         snr = self.snr
 
         n = tf.random.normal(
-            x.shape,
+            tf.shape(x),
             mean=0,
             stddev=tf.math.sqrt(1/(2*snr))
         )
@@ -100,7 +100,7 @@ class AWGNChannel(tf.keras.layers.Layer):
         snr = self.snr
 
         n = tf.random.normal(
-            x.shape,
+            tf.shape(x),
             mean=0,
             stddev=tf.math.sqrt(1/(2*snr))
         )

@@ -8,7 +8,6 @@ import time
 import datetime
 import argparse
 
-from config import BATCH_SIZE, TRAIN_CHANNEL
 from models.model import SemVit
 from utils.datasets import dataset_generator
 # Reference: https://www.tensorflow.org/tutorials/quickstart/advanced?hl=ko
