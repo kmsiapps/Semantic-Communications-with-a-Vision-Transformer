@@ -7,11 +7,14 @@ import tensorflow as tf
 from tensorflow.python.keras.callbacks import TensorBoard
 import argparse
 
-from models.model import SemVit
+from models.model import SemViT
 from models.deepjscc import DeepJSCC
 from utils.datasets import dataset_generator
 
 def main(args):
+  if args.gpu:
+    os.environ["CUDA_VISIBLE_DEVICES"]=args.gpu
+
   # Load CIFAR-10 dataset
   train_ds, test_ds = prepare_dataset()
 
@@ -22,19 +25,19 @@ def main(args):
   # strategy = tf.distribute.MultiWorkerMirroredStrategy()
   # with strategy.scope():
 
-  '''
-  model = SemVit(
+  model = SemViT(
     args.block_types,
     args.filters,
     args.repetitions,
-    args.dim_per_head,
-    args.data_size,
+    has_gdn=args.gdn,
+    num_symbols=args.data_size,
     snrdB=args.train_snrdB,
-    channel=args.channel_types,
-    papr_reduction=args.papr_reduction
+    channel=args.channel_types
   )
-  '''
-  model = DeepJSCC(snrdB=args.train_snrdB, channel=args.channel_types)
+  # model = DeepJSCC(
+  #   snrdB=args.train_snrdB,
+  #   channel=args.channel_types
+  # )
 
   def psnr(y_true, y_pred):
     return tf.image.psnr(y_true, y_pred, max_val=1)
@@ -48,6 +51,9 @@ def main(args):
           psnr
       ]
   )
+
+  model.build(input_shape=(None, 32, 32, 3))
+  model.summary()
   
   if args.ckpt is not None:
     model.load_weights(args.ckpt)
@@ -120,11 +126,12 @@ if __name__ == "__main__":
 
   parser.add_argument('--filters', nargs='+', help='number of output dimensions for each block', required=True, type=int)
   parser.add_argument('--repetitions', nargs='+', help='repetitions of each block', required=True, type=int)
+  parser.add_argument('--gdn', type=lambda x: True if x.lower() == 'true' else False, default=True, help='(true/false) use gdn/igdn')
 
   parser.add_argument('--initial_epoch', type=int, default=0, help='initial epoch')
-  parser.add_argument('--dim_per_head', type=int, default=32, help='dimensions per head in ViT blocks')
-  parser.add_argument('--papr_reduction', type=str, default=None, help='papr reduction method ("clip" or None)')
   parser.add_argument('--ckpt', type=str, default=None, help='checkpoint file path (optional)')
+
+  parser.add_argument('--gpu', type=str, default=None, help='GPU index to use (e.g., "0" or "0,1")')
 
   args = parser.parse_args()
   main(args)

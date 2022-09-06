@@ -1,33 +1,44 @@
 import tensorflow as tf
-
-from models.resblock import ResBlock
-from models.vitblock import VitBlock
+import tensorflow_compression as tfc
 from models.channellayer import RayleighChannel, AWGNChannel
+from models.vitblock import VitBlock
 
+# Modified from DeepJSCC codes (https://github.com/kurka/deepJSCC-feedback/blob/master/jscc.py)
 
-class SemVit(tf.keras.Model):
-    def __init__(self, block_types, filters, num_blocks, dim_per_head,
-                 num_symbols, papr_reduction='clip', snrdB=25, channel='AWGN'):
+class SemViT(tf.keras.Model):
+    def __init__(self, block_types, filters, num_blocks, has_gdn=True,
+                 num_symbols=512, snrdB=25, channel='AWGN'):
         '''
-        block_types: types of each building blocks
+        block_types: (list) types of each building blocks
             'V' for ViT block, 'C' for Conv (ResNet) block
-            e.g., ['C', 'C', 'V', 'V', 'V', 'C', 'C', 'C']
-        filters: output dimensions for each block
-            e.g., [64, 96, 192, 384, 384, 192, 96, 64]
-        num_blocks: # of repetition for each block
-            e.g., [2, 2, 2, 4, 4, 2, 2, 2]
-        num_symbols: # of total complex symbols sent
-        papr: type of papr-reduction methods. 'clip' for clipping, None for nothing
-        snrdB: channel snr (in dB)
-        channel: channel type ('Rayleigh' or 'AWGN')
+            e.g., ['C', 'C', 'V', 'V', 'C', 'C']
+        filters: (list) output dimensions for each block
+            e.g., [256, 256, 256, 256, 256, 256]
+        num_blocks: (list) # of repetition for each block
+            e.g., [1, 1, 3, 3, 1, 1]
+        has_gdn: (bool) include GDN/IGDN?
+        num_symbols: (int) # of total complex symbols sent
+            e.g., 512 for 1/6 bandwidth ratio (512 / 32*32*3)
+        snrdB: (int) channel snr (in dB)
+        channel: (str) channel type ('Rayleigh', 'AWGN', or None)
         '''
-        assert len(filters) == len(num_blocks) == len(block_types) == 8, \
-               "block_types, filters and num_blocks must have same size (8)"
-
         super().__init__()
+        if has_gdn:
+            gdn_func=tfc.layers.GDN()
+            igdn_func=tfc.layers.GDN(inverse=True)
+        else:
+            gdn_func=tf.keras.layers.Lambda(lambda x: x)
+            igdn_func=tf.keras.layers.Lambda(lambda x: x)
 
-        self.encoder = SemVit_Encoder(
-            block_types[:4], filters[:4], num_blocks[:4], dim_per_head, num_symbols, papr_reduction=papr_reduction)
+        assert len(block_types) == len(filters) == len(num_blocks) == 6, \
+               "length of block_types, filters, num_blocks should be 6"
+        self.encoder = SemViT_Encoder(
+            block_types[:3],
+            filters[:3],
+            num_blocks[:3],
+            num_symbols,
+            gdn_func=gdn_func
+        )
 
         if channel == 'Rayleigh':
             self.channel = RayleighChannel(snrdB)
@@ -36,9 +47,12 @@ class SemVit(tf.keras.Model):
         else:
             self.channel = tf.identity
 
-        self.decoder = SemVit_Decoder(
-            block_types[4:], filters[4:], num_blocks[4:], dim_per_head, num_symbols)
-
+        self.decoder = SemViT_Decoder(
+            block_types[3:],
+            filters[3:],
+            num_blocks[3:],
+            gdn_func=igdn_func
+        )
     
     def call(self, x):
         x = self.encoder(x)
@@ -54,136 +68,109 @@ class SemVit(tf.keras.Model):
         return x
 
 
-class SemVit_Encoder(tf.keras.layers.Layer):
-    def __init__(self, block_types, filters, num_blocks, dim_per_head, num_symbols, papr_reduction):
+class SemViT_Encoder(tf.keras.layers.Layer):
+    def __init__(self, block_types, filters, num_blocks,
+                 num_symbols, gdn_func=None, **kwargs):
         super().__init__()
-        # 32 x 32 input
-        self.l0 = build_blocks(0, block_types, num_blocks, filters, dim_per_head, 32)
-        
-        # downsampled to 16 x 16
-        self.l1 = build_blocks(1, block_types, num_blocks, filters, dim_per_head, 16)
+        self.layers = [
+            # 32 x 32 input
+            build_blocks(0, block_types, num_blocks, filters, 32, kernel_size=9, stride=2, gdn_func=gdn_func),
+            # downsampled to 16 x 16
+            build_blocks(1, block_types, num_blocks, filters, 16, kernel_size=5, stride=2, gdn_func=gdn_func),
+            # downsampled to 8 x 8
+            build_blocks(2, block_types, num_blocks, filters, 8, kernel_size=5, gdn_func=gdn_func),
+            # to constellation
+            tf.keras.layers.Conv2D(
+                filters=num_symbols // 8 // 8 * 2,
+                # current spatial dimension is 8 x 8
+                # and 2 for iq dimension
+                kernel_size=1
+            )
+        ]
 
-        # downsampled to 8 x 8
-        self.l2 = build_blocks(2, block_types, num_blocks, filters, dim_per_head, 8)
-        
-        # downsampled to 4 x 4
-        self.l3 = build_blocks(3, block_types, num_blocks, filters, dim_per_head, 4)
 
-        self.num_symbols = num_symbols
-        self.to_constellation = tf.keras.layers.Conv2D(
-            filters=num_symbols // 16 * 2,
-            # current spatial dimension is 4 x 4
-            # and 2 for iq dimension
-            kernel_size=1
-        )
-
-        self.papr_reduction = papr_reduction
-    
     def call(self, x):
-        x = self.l0(x)
-        x = tf.image.resize(x, (16, 16))
-
-        x = self.l1(x)
-        x = tf.image.resize(x, (8, 8))
-
-        x = self.l2(x)
-        x = tf.image.resize(x, (4, 4))
-
-        x = self.l3(x)
-        x = self.to_constellation(x)
-        x = tf.reshape(x, (-1, self.num_symbols, 2))
-
-        # TODO: polar coordinate로 바꿔서 잘 clipping? 지금은 사각형이라 꼭짓점 쪽이 파워가 더 큼
-        if self.papr_reduction == 'clip':
-            i = x[:, :, 0]
-            q = x[:, :, 1]
-            avg_power = tf.reduce_mean(i ** 2 + q ** 2)
-            PAPR_CONST = 1.2
-            max_amp = tf.sqrt(avg_power * PAPR_CONST)
-            x = tf.clip_by_value(x, -1 * max_amp, max_amp)
-
-        # # power normalization
-        # i = x[:, :, 0]
-        # q = x[:, :, 1]
-        # avg_power = tf.reduce_mean(i ** 2 + q ** 2)
-        # x = x / tf.sqrt(avg_power)
-
+        for sublayer in self.layers:
+            x = sublayer(x)
+        
+        b, h, w, c = x.shape
+        x = tf.reshape(x, (-1, h*w*c//2, 2))
         return x
 
 
-class SemVit_Decoder(tf.keras.layers.Layer):
-    def __init__(self, block_types, filters, num_blocks, dim_per_head, num_symbols):
+class SemViT_Decoder(tf.keras.layers.Layer):
+    def __init__(self, block_types, filters, num_blocks, gdn_func=None, **kwargs):
         super().__init__()
-        self.num_symbols = num_symbols
+        self.layers = [
+            # 8 x 8 input
+            build_blocks(0, block_types, num_blocks, filters, 8, kernel_size=5, gdn_func=gdn_func),
+            # upsampled to 16 x 16
+            tf.keras.layers.Resizing(16, 16),
+            build_blocks(1, block_types, num_blocks, filters, 16, kernel_size=5, gdn_func=gdn_func),
+            # upsampled to 32 x 32
+            tf.keras.layers.Resizing(32, 32),
+            build_blocks(2, block_types, num_blocks, filters, 32, kernel_size=9, gdn_func=gdn_func),
+            # to image
+            tf.keras.layers.Conv2D(
+                filters=3,
+                kernel_size=1,
+                activation='sigmoid'
+            )
+        ]
 
-        self.l4 = build_blocks(0, block_types, num_blocks, filters, dim_per_head, 4)
 
-        # assume 8 x 8 input (up-sampled from 4x4, 96, 2)
-        self.l5 = build_blocks(1, block_types, num_blocks, filters, dim_per_head, 8)
-        
-        # upsampled to 16 x 16
-        self.l6 = build_blocks(2, block_types, num_blocks, filters, dim_per_head, 16)
-        
-        # upsampled to 32 x 32
-        self.l7 = build_blocks(3, block_types, num_blocks, filters, dim_per_head, 32)
-
-        self.to_image = tf.keras.layers.Conv2D(
-            kernel_size=1,
-            filters=3,
-            padding='same'
-        )
-
-        self.image_normalize = tf.math.sigmoid # lambda x: tf.nn.relu6(x) / 6
-    
     def call(self, x):
-        x = tf.reshape(x, (-1, 4, 4, self.num_symbols // 16 * 2))
-        x = self.l4(x)
-        
-        x = tf.image.resize(x, (8, 8))
-        x = self.l5(x)
+        b, c, _ = x.shape
+        x = tf.reshape(x, (-1, 8, 8, c*2//64))
 
-        x = tf.image.resize(x, (16, 16)) # bilinear upsampling
-        x = self.l6(x)
-
-        x = tf.image.resize(x, (32, 32))
-        x = self.l7(x)
-
-        x = self.to_image(x)
-        x = self.image_normalize(x)
-
+        for sublayer in self.layers:
+            x = sublayer(x)
         return x
 
 
-def build_blocks(layer_idx, block_types, num_blocks, filters, dim_per_head, spatial_size):
+def build_blocks(layer_idx, block_types, num_blocks, filters, spatial_size, kernel_size=5, stride=1, gdn_func=None):
+    assert block_types[layer_idx] in ('C', 'V'), "layer type should be either C or V"
+
     if block_types[layer_idx] == 'C':
-        return build_resblocks(
+        return build_conv(
             repetition=num_blocks[layer_idx],
             filter_size=filters[layer_idx],
-            kernel_size=5)
+            kernel_size=kernel_size,
+            stride=stride,
+            gdn_func=gdn_func)
     else:
         return build_vitblocks(
             repetition=num_blocks[layer_idx],
-            num_heads=filters[layer_idx]//dim_per_head,
-            head_size=dim_per_head,
-            spatial_size=spatial_size)
+            num_heads=filters[layer_idx]//32,
+            head_size=32,
+            spatial_size=spatial_size,
+            stride=stride,
+            gdn_func=gdn_func)
 
 
-def build_resblocks(repetition, filter_size, kernel_size=5):
+def build_conv(repetition, filter_size, kernel_size=5, stride=1, gdn_func=None):
     x = tf.keras.Sequential()
-    x.add(ResBlock(filter_size, stride=1, kernel_size=kernel_size, is_bottleneck=False))
-    for _ in range(repetition-1):
-        x.add(ResBlock(filter_size, is_bottleneck=False))
+    for i in range(repetition):
+        s = stride if i == 0 else 1
+        x.add(tfc.SignalConv2D(
+                filter_size,
+                kernel_size,
+                corr=True,
+                strides_down=s,
+                padding="same_zeros",
+                use_bias=True,
+        ))
+        if gdn_func:
+            x.add(gdn_func)
+        x.add(tf.keras.layers.PReLU(shared_axes=[1, 2]))
     return x
 
 
-def build_vitblocks(repetition, num_heads, head_size, spatial_size):
+def build_vitblocks(repetition, num_heads, head_size, spatial_size, stride=1, gdn_func=None):
     x = tf.keras.Sequential()
-    x.add(VitBlock(num_heads, head_size,
-                    spatial_size, downsample=False))
-    
-    for _ in range(repetition-1):
-        x.add(VitBlock(num_heads, head_size, spatial_size))
+    for i in range(repetition):
+        s = stride if i == 0 else 1
+        x.add(VitBlock(num_heads, head_size, spatial_size, stride=s))
+        if gdn_func:
+            x.add(gdn_func)
     return x
-
-
-

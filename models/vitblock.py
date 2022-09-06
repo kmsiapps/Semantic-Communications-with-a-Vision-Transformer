@@ -121,29 +121,25 @@ class RelativeMHSA(tf.keras.layers.Layer):
 
 class VitBlock(tf.keras.layers.Layer):
     def __init__(self, num_heads, head_size,
-                 spatial_size, downsample=False):
+                 spatial_size, stride=1):
         '''
         num_heads: the number of heads
         head_size: channel dimensions per head
         spatial_size: height/width of the input
                       (before downsampling)
-        downsample: (boolean) 1/2 downsampling before MHSA
+        patchmerge: (boolean) 1/2 downsampling before MHSA
         '''
         super().__init__()
 
         d_out = num_heads * head_size
         self.ln1 = tf.keras.layers.LayerNormalization()
 
-        # 1/2 downsample (concat & linear projection)
-        if downsample:
-            self.downsample = tf.keras.layers.Conv2D(
-                filters=d_out,
-                kernel_size=2,
-                strides=2
-            )
-            spatial_size //= 2
-        else:    
-            self.downsample = tf.identity
+        self.patchmerge = tf.keras.layers.Conv2D(
+            filters=d_out,
+            kernel_size=stride,
+            strides=stride,
+        )
+        spatial_size //= stride
 
         self.mhsa = RelativeMHSA(
             num_heads=num_heads,
@@ -151,18 +147,12 @@ class VitBlock(tf.keras.layers.Layer):
             spatial_size=spatial_size
         )
 
-        self.proj = tf.keras.layers.Conv2D(
-            filters=d_out,
-            kernel_size=1
-        )
-
         self.ln2 = tf.keras.layers.LayerNormalization()
         self.mlp = MLP(d_out)
 
     def call(self, x):
-        x = self.downsample(x)
+        x = self.patchmerge(x)
         x = self.ln1(x)
-        x = self.proj(x)
         x_residual = x
 
         x = self.mhsa(x) 

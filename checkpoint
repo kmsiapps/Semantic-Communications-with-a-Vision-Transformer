@@ -1,2 +1,2 @@
-model_checkpoint_path: "DeepJSCC_10dB_noGDN-ReLU_300"
-all_model_checkpoint_paths: "DeepJSCC_10dB_noGDN-ReLU_300"
+model_checkpoint_path: "CCVVCC_7dB_600"
+all_model_checkpoint_paths: "CCVVCC_7dB_600"
