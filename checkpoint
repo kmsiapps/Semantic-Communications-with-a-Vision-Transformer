@@ -1,2 +1,2 @@
-model_checkpoint_path: "CCVVCC_7dB_600"
-all_model_checkpoint_paths: "CCVVCC_7dB_600"
+model_checkpoint_path: "CCVVCC_768_0dB_600"
+all_model_checkpoint_paths: "CCVVCC_768_0dB_600"

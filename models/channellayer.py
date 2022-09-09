@@ -10,21 +10,21 @@ class RayleighChannel(tf.keras.layers.Layer):
 
     def call(self, x):
         '''
-        x: inputs with shape (2, Batch, Any)
-           where first dimension denotes in-phase and quadrature-phase elements, respectively.
+        x: inputs with shape (b, c, 2)
+           where last dimension denotes in-phase and quadrature-phase elements, respectively.
         Assumes slow rayleigh fading, where h does not change for single batch data
 
         We clip the coefficient h to generate short-term SNR between +-5 dB of given long-term SNR.
         '''
-        assert x.shape[0] == 2, "input shape should be (2, Batch, Any), where first dimension denotes i and q, respectively"
-        assert len(x.shape) >= 3, "input shape should be (2, Batch, Any)"
+        assert x.shape[2] == 2, "input shape should be (b, c, 2), where last dimension denotes i and q, respectively"
+        assert len(x.shape) == 3, "input shape should be (b, c, 2)"
         
-        i = x[0]
-        q = x[1]
+        i = x[:,:,0]
+        q = x[:,:,1]
 
-        b = x.shape[1]
+        b = x.shape[0]
         h_shape = [1 for _ in range(len(x.shape))]
-        h_shape[1] = b
+        h_shape[0] = b
         h_shape = tuple(h_shape)
 
         # power normalization
@@ -68,6 +68,11 @@ class RayleighChannel(tf.keras.layers.Layer):
         yhat = yhat * normalizer
 
         return yhat
+    
+
+    def get_config(self):
+        config = super().get_config()
+        return config
 
 
 class AWGNChannel(tf.keras.layers.Layer):
@@ -78,13 +83,14 @@ class AWGNChannel(tf.keras.layers.Layer):
 
     def call(self, x):
         '''
-        x: inputs with shape (2, Any)
-           where first dimension denotes in-phase and quadrature-phase elements, respectively.
+        x: inputs with shape (b, c, 2)
+           where last dimension denotes in-phase and quadrature-phase elements, respectively.
         '''
-        assert x.shape[0] == 2, "input shape should be (2, Any), which denotes i and q, respectively"
-        
-        i = x[0]
-        q = x[1]
+        assert x.shape[2] == 2, "input shape should be (b, c, 2), where last dimension denotes i and q, respectively"
+        assert len(x.shape) == 3, "input shape should be (b, c, 2)"
+
+        i = x[:,:,0]
+        q = x[:,:,1]
 
         # power normalization
         normalizer = tf.math.sqrt(
@@ -109,3 +115,9 @@ class AWGNChannel(tf.keras.layers.Layer):
 
         yhat = y * normalizer
         return yhat
+    
+
+    def get_config(self):
+        config = super().get_config()
+        return config
+

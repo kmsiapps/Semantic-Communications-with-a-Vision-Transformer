@@ -8,7 +8,6 @@ from tensorflow.python.keras.callbacks import TensorBoard
 import argparse
 
 from models.model import SemViT
-from models.deepjscc import DeepJSCC
 from utils.datasets import dataset_generator
 
 def main(args):

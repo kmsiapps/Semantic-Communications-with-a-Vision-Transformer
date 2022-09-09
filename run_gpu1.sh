@@ -11,6 +11,10 @@
 # python3 ./train_dist.py 512 AWGN 5 CCVVCC CCVVCC_5dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false  --initial_epoch 464 --ckpt ./ckpt/CCVVCC_5dB_460
 
 # python3 ./train_dist.py 256 AWGN 10 CCVVCC CCVVCC_256_10dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false
-python3 ./train_dist.py 256 AWGN 0 CCVVCC CCVVCC_256_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false
-python3 ./train_dist.py 256 AWGN 2 CCVVCC CCVVCC_256_2dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false
-python3 ./train_dist.py 256 AWGN 5 CCVVCC CCVVCC_256_5dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false
+# python3 ./train_dist.py 256 AWGN 0 CCVVCC CCVVCC_256_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false
+# python3 ./train_dist.py 256 AWGN 2 CCVVCC CCVVCC_256_2dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false
+
+# python3 ./train_dist.py 1024 AWGN 10 CCVVCC CCVVCC_1024_10dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false --initial_epoch 317 --ckpt ./ckpt/CCVVCC_1024_10dB_311
+
+# python3 ./train_dist.py 1024 AWGN 0 CCVVCC CCVVCC_1024_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false
+python3 ./train_dist.py 1536 AWGN 0 CCVVCC CCVVCC_1536_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false

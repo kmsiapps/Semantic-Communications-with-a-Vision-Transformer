@@ -35,3 +35,8 @@ class ResBlock(tf.keras.layers.Layer):
         x = tf.nn.relu(x)
 
         return x
+    
+
+    def get_config(self):
+        config = super().get_config()
+        return config

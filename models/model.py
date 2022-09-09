@@ -56,13 +56,7 @@ class SemViT(tf.keras.Model):
     
     def call(self, x):
         x = self.encoder(x)
-
-        # (b, c, iq(=2)) to (2, b, c) 
-        x = tf.transpose(x, (2, 0, 1))
         x = self.channel(x)
-
-        # (2, b, c) to (b, c, 2)
-        x = tf.transpose(x, (1, 2, 0))
         x = self.decoder(x)
 
         return x
@@ -96,6 +90,11 @@ class SemViT_Encoder(tf.keras.layers.Layer):
         b, h, w, c = x.shape
         x = tf.reshape(x, (-1, h*w*c//2, 2))
         return x
+    
+
+    def get_config(self):
+        config = super().get_config()
+        return config
 
 
 class SemViT_Decoder(tf.keras.layers.Layer):
@@ -126,6 +125,11 @@ class SemViT_Decoder(tf.keras.layers.Layer):
         for sublayer in self.layers:
             x = sublayer(x)
         return x
+    
+
+    def get_config(self):
+        config = super().get_config()
+        return config
 
 
 def build_blocks(layer_idx, block_types, num_blocks, filters, spatial_size, kernel_size=5, stride=1, gdn_func=None):

@@ -1,13 +1,17 @@
 # %%
 import os
+import tensorflow as tf
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
 
 import argparse
 
 from models.model import SemViT
-from models.deepjscc import DeepJSCC
 from utils.datasets import dataset_generator
+
+# NOTE: to calculate FLOPs with ViTs, disable positional embeddings
+#       - currently tensorflow profiler cannot return FLOPs with them
 
 def main(args):
   if args.gpu:
@@ -15,8 +19,6 @@ def main(args):
 
   EXPERIMENT_NAME = args.experiment_name
   print(f'Running {EXPERIMENT_NAME}')
-
-  # model = DeepJSCC()
 
   model = SemViT(
     args.block_types,
@@ -28,9 +30,56 @@ def main(args):
     channel=args.channel_types
   )
 
-  model.build(input_shape=(None, 32, 32, 3))
+  model.build(input_shape=(1, 32, 32, 3))
   model.summary()
-  
+
+  print(f'FLOPS: {get_flops(model):.2f}GFLOPs')
+
+
+def get_flops(model) -> float:
+    """
+    Calculate FLOPS [GFLOPs] for a tf.keras.Model or tf.keras.Sequential model
+    in inference mode. It uses tf.compat.v1.profiler under the hood.
+    source: https://github.com/wandb/wandb/blob/latest/wandb/integration/keras/keras.py#L1025-L1073
+    """
+    if not isinstance(
+        model, (tf.keras.models.Sequential, tf.keras.models.Model)
+    ):
+        raise ValueError(
+            "Calculating FLOPS is only supported for "
+            "`tf.keras.Model` and `tf.keras.Sequential` instances."
+        )
+
+    from tensorflow.python.framework.convert_to_constants import (
+        convert_variables_to_constants_v2_as_graph,
+    )
+
+    # Compute FLOPs for one sample
+    batch_size = 1
+    inputs = tf.random.normal((1, 32, 32, 3))
+
+    # convert tf.keras model into frozen graph to count FLOPs about operations used at inference
+    real_model = tf.function(model).get_concrete_function(inputs)
+    frozen_func, _ = convert_variables_to_constants_v2_as_graph(real_model)
+
+    # Calculate FLOPs with tf.profiler
+    run_meta = tf.compat.v1.RunMetadata()
+    opts = (
+        tf.compat.v1.profiler.ProfileOptionBuilder(
+            tf.compat.v1.profiler.ProfileOptionBuilder().float_operation()
+        )
+        .with_empty_output()
+        .build()
+    )
+
+    flops = tf.compat.v1.profiler.profile(
+        graph=frozen_func.graph, run_meta=run_meta, cmd="scope", options=opts
+    )
+
+    tf.compat.v1.reset_default_graph()
+
+    # convert to GFLOPs
+    return (flops.total_float_ops / 1e9) / 2
 
 
 if __name__ == "__main__":
