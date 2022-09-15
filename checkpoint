@@ -1,2 +1,2 @@
-model_checkpoint_path: "CCCCCC_1024_0dB_600"
-all_model_checkpoint_paths: "CCCCCC_1024_0dB_600"
+model_checkpoint_path: "CCCCCC_512_10dB_600"
+all_model_checkpoint_paths: "CCCCCC_512_10dB_600"

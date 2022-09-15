@@ -22,15 +22,15 @@
 
 # python3 ./train_dist.py 768 AWGN 0 CCVVCC CCVVCC_768_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
 
-python3 ./train_dist.py 256 AWGN 0 CCCCCC CCCCCC_256_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
-python3 ./train_dist.py 256 AWGN 2 CCCCCC CCCCCC_256_2dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
-python3 ./train_dist.py 256 AWGN 5 CCCCCC CCCCCC_256_5dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
-python3 ./train_dist.py 256 AWGN 7 CCCCCC CCCCCC_256_7dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
-python3 ./train_dist.py 256 AWGN 10 CCCCCC CCCCCC_256_10dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
-python3 ./train_dist.py 256 AWGN 12 CCCCCC CCCCCC_256_12dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
-python3 ./train_dist.py 256 AWGN 15 CCCCCC CCCCCC_256_15dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+# python3 ./train_dist.py 256 AWGN 0 CCCCCC CCCCCC_256_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+# python3 ./train_dist.py 256 AWGN 2 CCCCCC CCCCCC_256_2dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+# python3 ./train_dist.py 256 AWGN 5 CCCCCC CCCCCC_256_5dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+# python3 ./train_dist.py 256 AWGN 7 CCCCCC CCCCCC_256_7dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+# python3 ./train_dist.py 256 AWGN 10 CCCCCC CCCCCC_256_10dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+# python3 ./train_dist.py 256 AWGN 12 CCCCCC CCCCCC_256_12dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+# python3 ./train_dist.py 256 AWGN 15 CCCCCC CCCCCC_256_15dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
 
-python3 ./train_dist.py 1536 AWGN 10 CCCCCC CCCCCC_1536_10dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+# python3 ./train_dist.py 1536 AWGN 10 CCCCCC CCCCCC_1536_10dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
 
-python3 ./train_dist.py 768 AWGN 0 CCCCCC CCCCCC_768_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
-python3 ./train_dist.py 1024 AWGN 0 CCCCCC CCCCCC_1024_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+# python3 ./train_dist.py 768 AWGN 0 CCCCCC CCCCCC_768_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+# python3 ./train_dist.py 1024 AWGN 0 CCCCCC CCCCCC_1024_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true

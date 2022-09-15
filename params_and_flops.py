@@ -24,8 +24,8 @@ def main(args):
     args.block_types,
     args.filters,
     args.repetitions,
-    args.dim_per_head,
-    args.data_size,
+    has_gdn=args.gdn,
+    num_symbols=args.data_size,
     snrdB=args.train_snrdB,
     channel=args.channel_types
   )
@@ -95,10 +95,9 @@ if __name__ == "__main__":
 
   parser.add_argument('--filters', nargs='+', help='number of output dimensions for each block', required=True, type=int)
   parser.add_argument('--repetitions', nargs='+', help='repetitions of each block', required=True, type=int)
+  parser.add_argument('--gdn', type=lambda x: True if x.lower() == 'true' else False, default=True, help='(true/false) use gdn/igdn')
 
   parser.add_argument('--initial_epoch', type=int, default=0, help='initial epoch')
-  parser.add_argument('--dim_per_head', type=int, default=32, help='dimensions per head in ViT blocks')
-  parser.add_argument('--papr_reduction', type=str, default=None, help='papr reduction method ("clip" or None)')
   parser.add_argument('--ckpt', type=str, default=None, help='checkpoint file path (optional)')
 
   parser.add_argument('--gpu', type=str, default=None, help='GPU index to use (e.g., "0" or "0,1")')
@@ -106,4 +105,4 @@ if __name__ == "__main__":
   args = parser.parse_args()
   main(args)
 
-# python3 ./summary.py 512 AWGN 10 CCCCCC DeepJSCC_test_10dB 300 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0
+# python3 ./params_and_flops.py 512 AWGN 10 CCCCCC CCCCCC 300 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0
