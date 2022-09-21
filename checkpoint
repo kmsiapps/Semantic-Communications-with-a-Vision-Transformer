@@ -1,2 +1,2 @@
-model_checkpoint_path: "CCCCCC_512_10dB_600"
-all_model_checkpoint_paths: "CCCCCC_512_10dB_600"
+model_checkpoint_path: "CCVVCC_512_10dB_Rayleigh_600"
+all_model_checkpoint_paths: "CCVVCC_512_10dB_Rayleigh_600"

@@ -32,4 +32,6 @@
 
 # python3 ./train_dist.py 1536 AWGN 0 CCCCCC CCCCCC_1536_0dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn true
 
-python3 ./train_dist.py 512 AWGN 10 CCCCCC CCCCCC_512_10dB 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn true
+# python3 ./train_dist.py 512 AWGN 10 CCCCCC CCCCCC_512_10dB_II 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn true
+
+python3 ./train_dist.py 512 Rayleigh 5 CCVVCC CCVVCC_512_5dB_Rayleigh 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 1 --gdn false

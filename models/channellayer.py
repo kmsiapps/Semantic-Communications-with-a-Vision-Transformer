@@ -22,50 +22,25 @@ class RayleighChannel(tf.keras.layers.Layer):
         i = x[:,:,0]
         q = x[:,:,1]
 
-        b = x.shape[0]
-        h_shape = [1 for _ in range(len(x.shape))]
-        h_shape[0] = b
-        h_shape = tuple(h_shape)
-
         # power normalization
-        normalizer = tf.math.sqrt(
-            tf.math.reduce_mean(i ** 2 + q ** 2)
-        )
-        x = x / normalizer
+        sig_power = tf.math.reduce_mean(i ** 2 + q ** 2)
         
+        # batch-wise slow fading
         h = tf.random.normal(
-            h_shape,
+            (1, 1, 2),
             mean=0,
-            stddev=(1/2)**0.5
+            stddev=tf.math.sqrt(0.5)
         )
 
-        h_sign = h / tf.abs(h)
-
-        h = tf.abs(h)
-        h = tf.clip_by_value(
-            h,
-            clip_value_min = 1/self.clip_snr,
-            clip_value_max = self.clip_snr
-        )
-
-        h = h * h_sign
-
-        '''
-        # for random SNR value, use below:
-        snrdB = random.randint(0, 40)
-        snr = 10 ** (snrdB / 10)
-        '''
         snr = self.snr
 
         n = tf.random.normal(
             tf.shape(x),
             mean=0,
-            stddev=tf.math.sqrt(1/(2*snr))
+            stddev=tf.math.sqrt(sig_power/(2*snr))
         )
 
-        nhat = tf.math.divide_no_nan(n, h)
-        yhat = x + nhat
-        yhat = yhat * normalizer
+        yhat = h * x + n
 
         return yhat
     
@@ -93,28 +68,17 @@ class AWGNChannel(tf.keras.layers.Layer):
         q = x[:,:,1]
 
         # power normalization
-        normalizer = tf.math.sqrt(
-            tf.math.reduce_mean(i ** 2 + q ** 2)
-        )
-        x = x / normalizer
-
-        '''
-        # for random SNR value, use below:
-        snrdB = random.randint(0, 40)
-        snr = 10 ** (snrdB / 10)
-        '''
+        sig_power = tf.math.reduce_mean(i ** 2 + q ** 2)
         snr = self.snr
 
         n = tf.random.normal(
             tf.shape(x),
             mean=0,
-            stddev=tf.math.sqrt(1/(2*snr))
+            stddev=tf.math.sqrt(sig_power/(2*snr))
         )
 
         y = x + n
-
-        yhat = y * normalizer
-        return yhat
+        return y
     
 
     def get_config(self):

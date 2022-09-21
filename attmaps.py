@@ -28,7 +28,7 @@ def main(args):
 	def psnr(y_true, y_pred):
 		return tf.image.psnr(y_true, y_pred, max_val=1)
 
-	f = open('cossim.csv', 'w', newline='')
+	f = open('attmaps.csv', 'w', newline='')
 	csv_writer = csv.writer(f)
 
 	csv_writer.writerow(['name', 'arch', '# of symbols', 'train SNR(dB)']
