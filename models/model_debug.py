@@ -308,7 +308,7 @@ class RelativeMHSA(tf.keras.layers.Layer):
         v = tf.reshape(v, (-1, h, w, c))
 
         v = self.head_transform(v)
-        return v, att_map, pos_emb
+        return v, tf.reduce_mean(att_map, axis=0), self.learned_pos_emb
 
 
 class VitBlock(tf.keras.layers.Layer):
