@@ -14,6 +14,7 @@ from utils.datasets import dataset_generator
 
 ckpt_dir = './ckpt_timeseries'
 test_ckpts = list(set([name.split('.')[0] for name in os.listdir(ckpt_dir)]))
+
 # get checkpoint name from given directory (without extensions)
 
 test_ckpts.sort()
@@ -55,10 +56,12 @@ def main(args):
 		avg_cossim = [0 for _ in range(7)]
 		for image, _ in test_ds:
 			# UGLY SOLUTION: MAKE CUSTOM MODEL THAT RETURNS EVERY LAYER OUTPUT
-			pred, m = model(image)
+			pred, m, *_ = model(image)
+
+			# m: [enc_input, l0, l1, l2, enc_proj, dec_input, l3, resize, l4, resize, l5, proj]
 
 			# remove resizing/projection layers
-			intermediate_outputs = [m[0], m[1], m[2], m[4], m[5], m[7], m[9]]
+			intermediate_outputs = [m[1], m[2], m[3], m[4], m[6], m[8], m[10]]
 
 			for idx, x in enumerate(intermediate_outputs):
 				avg_cossim[idx] += float(get_avg_cossim(x))

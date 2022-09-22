@@ -54,11 +54,11 @@ class SemViT_Debug(tf.keras.Model):
         )
     
     def call(self, x):
-        x, enc_out, enc_att, enc_pos = self.encoder(x)
+        x, enc_out, enc_att, enc_pos, enc_cossims = self.encoder(x)
         x = self.channel(x)
-        x, dec_out, dec_att, dec_pos = self.decoder(x)
+        x, dec_out, dec_att, dec_pos, dec_cossims = self.decoder(x)
 
-        return x, enc_out + dec_out, enc_att + dec_att, enc_pos + dec_pos
+        return x, enc_out + dec_out, enc_att + dec_att, enc_pos + dec_pos, enc_cossims + dec_cossims
 
 
 class SemViT_Encoder(tf.keras.layers.Layer):
@@ -85,19 +85,27 @@ class SemViT_Encoder(tf.keras.layers.Layer):
         layer_outputs = []
         att_maps = []
         pos_embs = []
+        cossims = []
         layer_outputs.append(x)
 
-        for sublayer in self.layers:
-            x = sublayer(x)
-            if isinstance(x, tuple) and len(x) == 3:
-                x, att_map, pos_emb = x
-                att_maps.append(att_map)
-                pos_embs.append(pos_emb)
+        for idx, sublayer in enumerate(self.layers):
+            if idx == 2:
+                for subsublayer in sublayer.layers:
+                    dummy_ref = []
+                    if isinstance(subsublayer, VitBlock):
+                        x = subsublayer(x, dummy_ref=dummy_ref)
+                        att_maps.append(dummy_ref[0])
+                        pos_embs.append(dummy_ref[1])
+                        cossims.append(get_avg_cossim(x))
+                    else:
+                        x = subsublayer(x)
+            else:
+                x = sublayer(x)
             layer_outputs.append(x)
         
         b, h, w, c = x.shape
         x = tf.reshape(x, (-1, h*w*c//2, 2))
-        return x, layer_outputs, att_maps, pos_embs
+        return x, layer_outputs, att_maps, pos_embs, cossims
 
 
 
@@ -129,17 +137,46 @@ class SemViT_Decoder(tf.keras.layers.Layer):
         layer_outputs = []
         att_maps = []
         pos_embs = []
+        cossims = []
         layer_outputs.append(x)
 
-        for sublayer in self.layers:
-            x = sublayer(x)
-            if isinstance(x, tuple) and len(x) == 3:
-                x, att_map, pos_emb = x
-                att_maps.append(att_map)
-                pos_embs.append(pos_emb)
+        for idx, sublayer in enumerate(self.layers):
+            if idx == 0:
+                for subsublayer in sublayer.layers:
+                    dummy_ref = []
+                    if isinstance(subsublayer, VitBlock):
+                        x = subsublayer(x, dummy_ref=dummy_ref)
+                        att_maps.append(dummy_ref[0])
+                        pos_embs.append(dummy_ref[1])
+                        cossims.append(get_avg_cossim(x))
+                    else:
+                        x = subsublayer(x)
+            else:
+                x = sublayer(x)
             layer_outputs.append(x)
 
-        return x, layer_outputs, att_maps, pos_embs
+        return x, layer_outputs, att_maps, pos_embs, cossims
+
+def get_avg_cossim(x):
+	'''
+	Get average cosine similarity along spatial domain, except for self-similarity
+	x: tensor with shape (B, H, W, C)
+	'''
+	b, h, w, c = tf.shape(x)
+	assert h == w, 'h should be equal to w'
+	
+	x1 = tf.reshape(x, (-1, h*w, c))
+	x2 = tf.reshape(x, (-1, h*w, c))
+
+	cossim = tf.einsum('bic,bjc->bij', x1, x2)
+	normalizer = tf.norm(x1, axis=-1, keepdims=True) * tf.reshape(tf.norm(x2, axis=-1), (-1, 1, h*w))
+	cossim = cossim / normalizer
+
+	# remove diagonal elements
+	cossim = tf.linalg.set_diag(cossim, tf.zeros(cossim.shape[0:-1]))
+	avg_cossim = tf.reduce_sum(cossim) / tf.cast(b * (h*w*h*w - h*w), dtype=tf.float32)
+
+	return avg_cossim
 
 
 def build_blocks(layer_idx, block_types, num_blocks, filters, spatial_size, kernel_size=5, stride=1, gdn_func=None):
@@ -295,6 +332,7 @@ class RelativeMHSA(tf.keras.layers.Layer):
 
         # add rel. pos. encoding to attention map
         pos_emb = tf.gather(self.learned_pos_emb, self.pos_emb_idx)
+        # att_before_pe = att_map
 
         att_map = att_map + pos_emb
         att_map = tf.nn.softmax(att_map)
@@ -343,7 +381,7 @@ class VitBlock(tf.keras.layers.Layer):
         self.ln2 = tf.keras.layers.LayerNormalization()
         self.mlp = MLP(d_out)
 
-    def call(self, x):
+    def call(self, x, dummy_ref=[]):
         att_map = []
         pos_emb = []
         if isinstance(x, tuple) and len(x) == 3:
@@ -364,4 +402,6 @@ class VitBlock(tf.keras.layers.Layer):
         x = self.mlp(x)
         x = tf.add(x, x_residual)
 
-        return x, att_map, pos_emb
+        dummy_ref.append(att_map)
+        dummy_ref.append(pos_emb)
+        return x
