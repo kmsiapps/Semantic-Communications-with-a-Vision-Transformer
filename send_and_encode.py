@@ -1,24 +1,28 @@
 #%%
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
+
 import tensorflow as tf
 import numpy as np
 import socket
 
-import random
 import PIL.Image as pilimg
 import matplotlib.pyplot as plt
 import os
 
-from config import FILTERS, NUM_BLOCKS, DIM_PER_HEAD, DATA_SIZE, BATCH_SIZE
-from models.model import VitCommNet_Encoder_Only, VitCommNet_Decoder_Only
+from models.model import SemViT_Encoder_Only
 from utils.datasets import dataset_generator
+from config import USRP_HOST, USRP_PORT, NORMALIZE_CONSTANT
 
-from pilot import p_start, p_end, PILOT_SIZE, SAMPLE_SIZE
+from pilot import p_start_i, p_end_i, p_start_q, p_end_q, PILOT_SIZE, SAMPLE_SIZE
 
 ################## CONFIG ####################
-best_model = 'epoch_174.ckpt' # './model_checkpoints/encoder-512.ckpt'
-USRP_HOST = "192.168.0.2"
-USRP_PORT = 60000
+ARCH = 'CCVVCC'
+NUM_SYMBOLS = 512
+CKPT_NAME = './ckpt/CCVVCC_512_15dB_585'
+
 TARGET_JPEG_RATE = 2048
 # Our encoder produces 512 constellations per 32 x 32 patch
 # so for 256 * 256 image,
@@ -62,20 +66,20 @@ def imBatchtoImage(batch_images):
     image = tf.reshape(image, (-1, batch//divisor*w, c))
     return image
 
-encoder_network = VitCommNet_Encoder_Only(
-FILTERS,
-  NUM_BLOCKS,
-  DIM_PER_HEAD,
-  512,
-  snrdB=25,
-  channel='Rayleigh'
+encoder_network = SemViT_Encoder_Only(
+	ARCH,
+	[256, 256, 256, 256, 256, 256],
+	[1, 1, 3, 3, 1, 1],
+	has_gdn=False,
+	num_symbols=NUM_SYMBOLS,
 )
-encoder_network.load_weights(best_model)
+encoder_network.load_weights(CKPT_NAME).expect_partial()
 
 test_ds = dataset_generator('/dataset/CIFAR100/test')
 normalization_layer = tf.keras.layers.experimental.preprocessing.Rescaling(1./255)
 test_ds = test_ds.map(lambda x, y: (normalization_layer(x), y))
 
+#%%
 cam_mode = int(input('Image mode: CIFAR(0) vs CAM(1)?:'))
 
 if cam_mode:
@@ -103,8 +107,8 @@ send_addr = (USRP_HOST, USRP_PORT)
 
 data = encoder_network(images)
 
-i = tf.reshape(data[0], shape=(-1,))
-q = tf.reshape(data[1], shape=(-1,))
+i = tf.reshape(data[:,:,0], shape=(-1,))
+q = tf.reshape(data[:,:,1], shape=(-1,))
 
 # plt.title('In-phase')
 # plt.plot(i)
@@ -113,8 +117,6 @@ q = tf.reshape(data[1], shape=(-1,))
 # plt.title('Q-phase')
 # plt.plot(q)
 # plt.show()
-
-NORMALIZE_CONSTANT = 80
 
 i = i / NORMALIZE_CONSTANT
 q = q / NORMALIZE_CONSTANT
@@ -125,7 +127,7 @@ max_q = np.max(q)
 pwr = np.mean(i ** 2 + q ** 2)
 
 plt.title('Constellations')
-plt.scatter(i, q, s=0.01)
+plt.scatter(i, q, s=0.1)
 plt.xlim([-1, 1])
 plt.ylim([-1, 1])
 plt.show()
@@ -138,8 +140,8 @@ i = tf.clip_by_value(i, -32767, 32767)
 q = tf.clip_by_value(q, -32767, 32767)
 
 
-p_i = np.concatenate([p_start, i, p_end]).astype(np.int16)
-p_q = np.concatenate([p_start, q, p_end]).astype(np.int32)
+p_i = np.concatenate([p_start_i, i, p_end_i]).astype(np.int16)
+p_q = np.concatenate([p_start_q, q, p_end_q]).astype(np.int32)
 
 i_ = p_i
 q_ = np.left_shift(p_q, 16)
