@@ -102,8 +102,6 @@ def psnr(y_true, y_pred):
 test_psnr = tf.reduce_mean(psnr(image, pred))
 print(f'PSNR:{float(test_psnr):.2f}')
 
-f.close()
-
 # %%
 
 import numpy as np
