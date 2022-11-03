@@ -39,7 +39,7 @@ def get_fourier_diagonal_amp(x):
 
 	# fft: b, h, w
 	fourier_diagonal = tf.reduce_sum(fft_amp * tf.expand_dims(tf.eye(h), axis=0), axis=-1)
-	return tf.reduce_mean(fourier_diagonal, axis=0)
+	return tf.reduce_sum(fourier_diagonal, axis=0)
 
 for idx, test_ckpt in enumerate(test_ckpts):
 	print(f'Running {test_ckpt} ({idx+1:>03}/{len(test_ckpts):>03}): ')
@@ -96,7 +96,7 @@ for idx, test_ckpt in enumerate(test_ckpts):
 			avg_fourier_diagonal[idx] += get_fourier_diagonal_amp(tf.reduce_mean(x, axis=-1))
 		
 		average_image_fourier_diag += get_fourier_diagonal_amp(tf.reduce_mean(image, axis=-1))
-		i += 1
+		i += tf.shape(image)[0]
 
 	for idx, x in enumerate(avg_fourier_diagonal):
 		avg_fourier_diagonal[idx] = avg_fourier_diagonal[idx] / i
