@@ -39,7 +39,7 @@ def get_fourier_diagonal_amp(x):
 
 	# fft: b, h, w
 	fourier_diagonal = tf.reduce_sum(fft_amp * tf.expand_dims(tf.eye(h), axis=0), axis=-1)
-	return tf.reduce_sum(fourier_diagonal, axis=0)
+	return tf.reduce_mean(fourier_diagonal, axis=0)
 
 for idx, test_ckpt in enumerate(test_ckpts):
 	print(f'Running {test_ckpt} ({idx+1:>03}/{len(test_ckpts):>03}): ')
