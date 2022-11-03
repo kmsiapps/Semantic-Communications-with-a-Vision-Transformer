@@ -96,7 +96,7 @@ for idx, test_ckpt in enumerate(test_ckpts):
 			avg_fourier_diagonal[idx] += get_fourier_diagonal_amp(tf.reduce_mean(x, axis=-1))
 		
 		average_image_fourier_diag += get_fourier_diagonal_amp(tf.reduce_mean(image, axis=-1))
-		i += tf.shape(image)[0]
+		i += image.shape[0]
 
 	for idx, x in enumerate(avg_fourier_diagonal):
 		avg_fourier_diagonal[idx] = avg_fourier_diagonal[idx] / i
