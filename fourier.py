@@ -15,8 +15,8 @@ from utils.datasets import dataset_generator
 
 # ckpt_dir = './ckpt_timeseries'
 # test_ckpts = list(set([name.split('.')[0] for name in os.listdir(ckpt_dir)]))
-ckpt_dir = './'
-test_ckpt = 'CCCCCC_1536_10dB_599'
+ckpt_dir = './ckpt'
+test_ckpt = 'CCCCCC_512_10dB_597'
 
 # get checkpoint name from given directory (without extensions)
 
@@ -33,7 +33,7 @@ def get_fourier_diagonal_amp(x):
 
 	# fft: b, h, w
 	fourier_diagonal = tf.reduce_sum(fft_amp * tf.expand_dims(tf.eye(h), axis=0), axis=-1)
-	return fourier_diagonal
+	return tf.reduce_mean(fourier_diagonal, axis=0)
 
 
 def prepare_dataset():
@@ -58,13 +58,6 @@ test_ds = prepare_dataset()
 def psnr(y_true, y_pred):
 	return tf.image.psnr(y_true, y_pred, max_val=1)
 
-f = open('fourier.csv', 'w', newline='')
-csv_writer = csv.writer(f)
-
-csv_writer.writerow(['name', 'arch', '# of symbols', 'train SNR(dB)',
-										 'l0', 'l1', 'l2-0', 'l2-1', 'l2-2',
-										 'channel', 'l3-0', 'l3-1', 'l3-2', 'l4', 'l5'])
-
 print(f'Running {test_ckpt}: ')
 arch, num_symbols, snr_trained, *_ = test_ckpt.split('_')
 has_gdn = (arch == 'CCCCCC') or '_GDN_' in test_ckpt
@@ -83,7 +76,7 @@ model.load_weights(f'{ckpt_dir}/{test_ckpt}').expect_partial()
 # CALC COSSIM
 i = 0
 avg_fourier_diagonal = [0 for _ in range(11)]
-average_image = tf.zeros((BATCH_SIZE, 32, 32))
+average_image_fourier_diag = tf.zeros((32, 32))
 for image, _ in test_ds:
 	# UGLY SOLUTION: MAKE CUSTOM MODEL THAT RETURNS EVERY LAYER OUTPUT
 	pred, m, *_ = model(image)
@@ -94,13 +87,13 @@ for image, _ in test_ds:
 	for idx, x in enumerate(intermediate_outputs):
 		avg_fourier_diagonal[idx] += get_fourier_diagonal_amp(tf.reduce_mean(x, axis=-1))
 	
-	average_image += tf.reduce_mean(image, axis=-1)
+	average_image_fourier_diag += get_fourier_diagonal_amp(tf.reduce_mean(image, axis=-1))
 	i += 1
 
 for idx, x in enumerate(avg_fourier_diagonal):
-	avg_fourier_diagonal[idx] = tf.reduce_mean(x, axis=0) / i
+	avg_fourier_diagonal[idx] = avg_fourier_diagonal[idx] / i
 
-average_image /= i
+average_image_fourier_diag /= i
 
 def psnr(y_true, y_pred):
 	return tf.image.psnr(y_true, y_pred, max_val=1)
@@ -108,8 +101,6 @@ def psnr(y_true, y_pred):
 # PSNR to validate if models are well trained
 test_psnr = tf.reduce_mean(psnr(image, pred))
 print(f'PSNR:{float(test_psnr):.2f}')
-
-# csv_writer.writerow([test_ckpt, arch, num_symbols, int(snr_trained[:-2])] + avg_cossim)
 
 f.close()
 
@@ -187,7 +178,7 @@ plt.show()
 # %%
 
 # m: [l0, l1, l2-0, l2-1, l2-2, enc_proj, l3-0, l3-1, l3-2, l4, l5]
-target = [tf.reduce_mean(get_fourier_diagonal_amp(average_image), axis=0)] + avg_fourier_diagonal[:2] + [avg_fourier_diagonal[4]] + avg_fourier_diagonal[8:]
+target = [get_fourier_diagonal_amp(tf.expand_dims(average_image_fourier_diag, axis=0))] + avg_fourier_diagonal[:2] + [avg_fourier_diagonal[4]] + avg_fourier_diagonal[8:]
 yint = np.arange(0, len(target), 1)
 xs = [tf.linspace(0, 1, len(x)//2+1) for x in target]
 ys = [tf.math.log(x[:len(x)//2+1]) - tf.math.log(x[0]) for x in target]
