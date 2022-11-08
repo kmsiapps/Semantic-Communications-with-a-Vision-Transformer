@@ -180,3 +180,56 @@ def build_vitblocks(repetition, num_heads, head_size, spatial_size, stride=1, gd
         if gdn_func:
             x.add(gdn_func)
     return x
+
+
+class SemViT_Encoder_Only(tf.keras.Model):
+    def __init__(self, block_types, filters, num_blocks, has_gdn=True,
+                 num_symbols=512):
+        super().__init__()
+        if has_gdn:
+            gdn_func=tfc.layers.GDN()
+            igdn_func=tfc.layers.GDN(inverse=True)
+        else:
+            gdn_func=tf.keras.layers.Lambda(lambda x: x)
+            igdn_func=tf.keras.layers.Lambda(lambda x: x)
+
+        assert len(block_types) == len(filters) == len(num_blocks) == 6, \
+               "length of block_types, filters, num_blocks should be 6"
+        self.encoder = SemViT_Encoder(
+            block_types[:3],
+            filters[:3],
+            num_blocks[:3],
+            num_symbols,
+            gdn_func=gdn_func
+        )
+    
+    def call(self, x):
+        x = self.encoder(x)
+
+        return x
+
+
+class SemViT_Decoder_Only(tf.keras.Model):
+    def __init__(self, block_types, filters, num_blocks, has_gdn=True,
+                 num_symbols=512):
+        super().__init__()
+        if has_gdn:
+            gdn_func=tfc.layers.GDN()
+            igdn_func=tfc.layers.GDN(inverse=True)
+        else:
+            gdn_func=tf.keras.layers.Lambda(lambda x: x)
+            igdn_func=tf.keras.layers.Lambda(lambda x: x)
+
+        assert len(block_types) == len(filters) == len(num_blocks) == 6, \
+               "length of block_types, filters, num_blocks should be 6"
+        self.decoder = SemViT_Decoder(
+            block_types[3:],
+            filters[3:],
+            num_blocks[3:],
+            gdn_func=igdn_func
+        )
+    
+    def call(self, x):
+        x = self.decoder(x)
+
+        return x

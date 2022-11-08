@@ -97,11 +97,15 @@ class SemViT_Encoder(tf.keras.layers.Layer):
                         att_maps.append(dummy_ref[0])
                         pos_embs.append(dummy_ref[1])
                         cossims.append(get_avg_cossim(x))
+                        layer_outputs.append(x)
                     else:
                         x = subsublayer(x)
+                        if isinstance(subsublayer, tfc.SignalConv2D):
+                            cossims.append(get_avg_cossim(x))
+                            layer_outputs.append(x)
             else:
                 x = sublayer(x)
-            layer_outputs.append(x)
+                layer_outputs.append(x)
         
         b, h, w, c = x.shape
         x = tf.reshape(x, (-1, h*w*c//2, 2))
@@ -151,6 +155,8 @@ class SemViT_Decoder(tf.keras.layers.Layer):
                         cossims.append(get_avg_cossim(x))
                     else:
                         x = subsublayer(x)
+                        if isinstance(subsublayer, tfc.SignalConv2D):
+                            cossims.append(get_avg_cossim(x))
             else:
                 x = sublayer(x)
             layer_outputs.append(x)
