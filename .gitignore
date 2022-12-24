@@ -3,3 +3,8 @@ datasets/
 model_checkpoints/
 results/**
 logs/**
+ckpt/
+checkpoint
+logs/
+*.csv
+*.sh

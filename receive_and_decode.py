@@ -15,7 +15,7 @@ import time
 
 from pilot import p_start_i, p_end_i, p_start_q, p_end_q, PILOT_SIZE, SAMPLE_SIZE
 from models.model import SemViT_Encoder_Only, SemViT_Decoder_Only
-from config import RCV_ADDR, RCV_PORT, NORMALIZE_CONSTANT
+from config import RCV_ADDR, RCV_PORT, NORMALIZE_CONSTANT, BATCH_SIZE
 
 rcv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 rcv_addr = (RCV_ADDR, RCV_PORT)
@@ -28,13 +28,14 @@ EXPECTED_SAMPLE_SIZE = SAMPLE_SIZE - PILOT_SIZE * 2
 
 ARCH = 'CCVVCC'
 NUM_SYMBOLS = 512
-CKPT_NAME = './ckpt/CCVVCC_512_15dB_585'
+CKPT_NAME = './ckpt/CCVVCC_512_0dB_592'
+HAS_GDN = False
 
 encoder_network = SemViT_Encoder_Only(
 	ARCH,
 	[256, 256, 256, 256, 256, 256],
 	[1, 1, 3, 3, 1, 1],
-	has_gdn=False,
+	has_gdn=HAS_GDN,
 	num_symbols=NUM_SYMBOLS,
 )
 
@@ -42,7 +43,7 @@ decoder_network = SemViT_Decoder_Only(
 	ARCH,
 	[256, 256, 256, 256, 256, 256],
 	[1, 1, 3, 3, 1, 1],
-	has_gdn=False,
+	has_gdn=HAS_GDN,
 	num_symbols=NUM_SYMBOLS,
 )
 
@@ -287,7 +288,7 @@ while True:
 			rcv_iq[:, 1] = qhat * max_q
 			
 			rcv_iq = tf.cast(tf.convert_to_tensor(rcv_iq), tf.float32)
-			rcv_iq = tf.reshape(rcv_iq, (64, -1, 2))
+			rcv_iq = tf.reshape(rcv_iq, (BATCH_SIZE, -1, 2))
 
 			proposed_result = decoder_network(rcv_iq)
 			tf.keras.utils.save_img(f'./results/proposed_usrp.png', imBatchtoImage(proposed_result))
@@ -361,5 +362,6 @@ while True:
 			print(f"Effective SNR: {snrdB:.2f}dB")
 
 			rcv_data = bytes()
+
 
 # %%

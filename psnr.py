@@ -10,7 +10,7 @@ import csv
 from models.model import SemViT
 from utils.datasets import dataset_generator
 
-ckpt_dir = './bkup_ckpt/best'
+ckpt_dir = './ckpt/rician'
 test_SNRs = [0, 2, 5, 7, 10, 12, 15]
 test_ckpts = list(set([name.split('.')[0] for name in os.listdir(ckpt_dir)]))
 # get checkpoint name from given directory (without extensions)
@@ -48,7 +48,7 @@ def main(args):
 				has_gdn=has_gdn,
 				num_symbols=int(num_symbols),
 				snrdB=test_snrdB,
-				channel='Rayleigh'
+				channel='Rician'
 			)
 			model.load_weights(f'{ckpt_dir}/{ckpt_name}').expect_partial()
 

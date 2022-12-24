@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow_compression as tfc
-from models.channellayer import RayleighChannel, AWGNChannel
+from models.channellayer import RayleighChannel, AWGNChannel, RicianChannel
 from models.vitblock import VitBlock
 
 # Modified from DeepJSCC codes (https://github.com/kurka/deepJSCC-feedback/blob/master/jscc.py)
@@ -44,6 +44,8 @@ class SemViT(tf.keras.Model):
             self.channel = RayleighChannel(snrdB)
         elif channel == 'AWGN':
             self.channel = AWGNChannel(snrdB)
+        elif channel == 'Rician':
+            self.channel = RicianChannel(snrdB)
         else:
             self.channel = tf.identity
 

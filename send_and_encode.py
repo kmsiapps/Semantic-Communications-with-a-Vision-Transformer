@@ -21,7 +21,8 @@ from pilot import p_start_i, p_end_i, p_start_q, p_end_q, PILOT_SIZE, SAMPLE_SIZ
 ################## CONFIG ####################
 ARCH = 'CCVVCC'
 NUM_SYMBOLS = 512
-CKPT_NAME = './ckpt/CCVVCC_512_15dB_585'
+CKPT_NAME = './ckpt/CCVVCC_512_0dB_592'
+HAS_GDN = False
 
 TARGET_JPEG_RATE = 2048
 # Our encoder produces 512 constellations per 32 x 32 patch
@@ -70,7 +71,7 @@ encoder_network = SemViT_Encoder_Only(
 	ARCH,
 	[256, 256, 256, 256, 256, 256],
 	[1, 1, 3, 3, 1, 1],
-	has_gdn=False,
+	has_gdn=HAS_GDN,
 	num_symbols=NUM_SYMBOLS,
 )
 encoder_network.load_weights(CKPT_NAME).expect_partial()
@@ -187,5 +188,6 @@ while True:
 print(f'JPEG file size: {bytes} Bytes, Quality: {quality}')
 
 send_sock.close()
+
 
 # %%
