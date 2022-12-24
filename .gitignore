@@ -5,6 +5,5 @@ bkup_logs/
 bkup_ckpt/
 ckpt_timeseries/
 checkpoint
-logs/
 *.csv
 *.sh
