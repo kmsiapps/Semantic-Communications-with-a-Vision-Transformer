@@ -37,4 +37,31 @@
 
 # python3 ./train_dist.py 512 AWGN 10 CCVVCC CCVVCC_512_10dB_II 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
 
-python3 ./train_dist.py 512 Rayleigh 5 CCCCCC CCCCCC_512_5dB_Rayleigh 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+# python3 ./train_dist.py 512 Rayleigh 5 CCCCCC CCCCCC_512_5dB_Rayleigh 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+# python3 ./train_dist.py 512 Rayleigh 7 CCCCCC CCCCCC_512_7dB_Rayleigh 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+
+# python3 ./train_dist.py 512 Rayleigh 10 CCCCCC CCCCCC_512_10dB_Rayleigh 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+
+# python3 ./train_dist.py 512 Rayleigh 12 CCCCCC CCCCCC_512_12dB_Rayleigh 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+# python3 ./train_dist.py 512 Rayleigh 15 CCCCCC CCCCCC_512_15dB_Rayleigh 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+# python3 ./train_dist.py 512 Rayleigh 0 CCCCCC CCCCCC_512_0dB_Rayleigh 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+# python3 ./train_dist.py 512 Rayleigh 2 CCCCCC CCCCCC_512_2dB_Rayleigh 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+
+# python3 ./train_dist.py 512 Rayleigh 2 CCVVCC CCVVCC_512_2dB_Rayleigh 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false 
+
+# python3 ./train_dist.py 512 Rician 0 CCCCCC CCCCCC_512_0dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false 
+# python3 ./train_dist.py 512 Rician 2 CCCCCC CCCCCC_512_2dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false 
+# python3 ./train_dist.py 512 Rician 5 CCCCCC CCCCCC_512_5dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+
+# python3 ./train_dist.py 512 Rician 7 CCVVCC CCVVCC_512_7dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+# python3 ./train_dist.py 512 Rician 10 CCVVCC CCVVCC_512_10dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false
+# python3 ./train_dist.py 512 Rician 12 CCVVCC CCVVCC_512_12dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false 
+# python3 ./train_dist.py 512 Rician 15 CCVVCC CCVVCC_512_15dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn false 
+
+python3 ./train_dist.py 512 Rician 0 CCCCCC CCCCCC_512_0dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true 
+python3 ./train_dist.py 512 Rician 2 CCCCCC CCCCCC_512_2dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true 
+python3 ./train_dist.py 512 Rician 5 CCCCCC CCCCCC_512_5dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+python3 ./train_dist.py 512 Rician 7 CCCCCC CCCCCC_512_7dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true 
+python3 ./train_dist.py 512 Rician 10 CCCCCC CCCCCC_512_10dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true 
+python3 ./train_dist.py 512 Rician 12 CCCCCC CCCCCC_512_12dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true
+python3 ./train_dist.py 512 Rician 15 CCCCCC CCCCCC_512_15dB_Rician 600 --filters 256 256 256 256 256 256 --repetitions 1 1 3 3 1 1 --gpu 0 --gdn true

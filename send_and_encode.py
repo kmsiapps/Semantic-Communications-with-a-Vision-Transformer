@@ -21,7 +21,7 @@ from pilot import p_start_i, p_end_i, p_start_q, p_end_q, PILOT_SIZE, SAMPLE_SIZ
 ################## CONFIG ####################
 ARCH = 'CCVVCC'
 NUM_SYMBOLS = 512
-CKPT_NAME = './ckpt/CCVVCC_512_15dB_585'
+CKPT_NAME = './bkup_ckpt/best/awgn/CCVVCC_512_0dB_592'
 
 TARGET_JPEG_RATE = 2048
 # Our encoder produces 512 constellations per 32 x 32 patch

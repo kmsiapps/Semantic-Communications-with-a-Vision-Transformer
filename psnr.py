@@ -10,7 +10,7 @@ import csv
 from models.model import SemViT
 from utils.datasets import dataset_generator
 
-ckpt_dir = './bkup_ckpt/best'
+ckpt_dir = './bkup_ckpt/best/rayleigh'
 test_SNRs = [0, 2, 5, 7, 10, 12, 15]
 test_ckpts = list(set([name.split('.')[0] for name in os.listdir(ckpt_dir)]))
 # get checkpoint name from given directory (without extensions)
