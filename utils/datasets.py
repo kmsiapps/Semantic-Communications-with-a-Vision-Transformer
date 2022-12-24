@@ -1,6 +1,6 @@
 from tensorflow.keras.preprocessing import image_dataset_from_directory
 
-from config import BATCH_SIZE
+from config.train_config import BATCH_SIZE
 
 def dataset_generator(dir, mode=None, shuffle=True):
     if mode:

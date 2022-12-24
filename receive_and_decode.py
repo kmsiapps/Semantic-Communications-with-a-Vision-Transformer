@@ -13,7 +13,7 @@ import math
 import tensorflow as tf
 import time
 
-from pilot import p_start_i, p_end_i, p_start_q, p_end_q, PILOT_SIZE, SAMPLE_SIZE
+from usrp.pilot import p_start_i, p_end_i, p_start_q, p_end_q, PILOT_SIZE, SAMPLE_SIZE
 from models.model import SemViT_Encoder_Only, SemViT_Decoder_Only
 from config import RCV_ADDR, RCV_PORT, NORMALIZE_CONSTANT, BATCH_SIZE
 

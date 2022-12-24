@@ -20,7 +20,6 @@ def main(args):
   EXPERIMENT_NAME = args.experiment_name
   print(f'Running {EXPERIMENT_NAME}')
 
-  # TODO: PAPR loss **********************************************
   # strategy = tf.distribute.MultiWorkerMirroredStrategy()
   # with strategy.scope():
 
