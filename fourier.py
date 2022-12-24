@@ -15,13 +15,10 @@ from utils.datasets import dataset_generator
 
 # ckpt_dir = './ckpt_timeseries'
 # test_ckpts = list(set([name.split('.')[0] for name in os.listdir(ckpt_dir)]))
-ckpt_dir = './ckpt'
+ckpt_dir = './ckpt/rician/'
 test_ckpts = [
-	'CCVVCC_512_10dB_599',
-	'CCVVCC_1536_10dB_588',
-	'CCCCCC_512_10dB_597',
-	'CCCCCC_1536_10dB_599',
-	
+	'CCCCCC_512_10dB_Rician_585',
+	'CCVVCC_512_10dB_Rician_576'
 ]
 
 # get checkpoint name from given directory (without extensions)
@@ -66,7 +63,6 @@ for idx, test_ckpt in enumerate(test_ckpts):
 	def psnr(y_true, y_pred):
 		return tf.image.psnr(y_true, y_pred, max_val=1)
 
-	print(f'Running {test_ckpt}: ')
 	arch, num_symbols, snr_trained, *_ = test_ckpt.split('_')
 	has_gdn = (arch == 'CCCCCC') or '_GDN_' in test_ckpt
 
@@ -77,14 +73,14 @@ for idx, test_ckpt in enumerate(test_ckpts):
 		has_gdn=has_gdn,
 		num_symbols=int(num_symbols),
 		snrdB=int(snr_trained[:-2]),
-		channel='AWGN'
+		channel='Rician'
 	)
 	model.load_weights(f'{ckpt_dir}/{test_ckpt}').expect_partial()
 
 	# CALC COSSIM
 	i = 0
 	avg_fourier_diagonal = [0 for _ in range(11)]
-	average_image_fourier_diag = tf.zeros((32, 32))
+	average_image_fourier_diag = tf.zeros(32)
 	for image, _ in test_ds:
 		# UGLY SOLUTION: MAKE CUSTOM MODEL THAT RETURNS EVERY LAYER OUTPUT
 		pred, m, *_ = model(image)
@@ -184,7 +180,7 @@ for idx, test_ckpt in enumerate(test_ckpts):
 	# %%
 
 	# m: [l0, l1, l2-0, l2-1, l2-2, enc_proj, l3-0, l3-1, l3-2, l4, l5]
-	target = [get_fourier_diagonal_amp(tf.expand_dims(average_image_fourier_diag, axis=0))] + avg_fourier_diagonal[:2] + [avg_fourier_diagonal[4]] + avg_fourier_diagonal[8:]
+	target = [average_image_fourier_diag] + avg_fourier_diagonal[:2] + [avg_fourier_diagonal[4]] + avg_fourier_diagonal[8:]
 	yint = np.arange(0, len(target), 1)
 	xs = [tf.linspace(0, 1, len(x)//2+1) for x in target]
 	ys = [tf.math.log(x[:len(x)//2+1]) - tf.math.log(x[0]) for x in target]

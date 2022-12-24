@@ -12,10 +12,12 @@ import csv
 from models.model_debug import SemViT_Debug
 from utils.datasets import dataset_generator
 
-# ckpt_dir = './ckpt_timeseries'
+ckpt_dir = './ckpt'
 # test_ckpts = list(set([name.split('.')[0] for name in os.listdir(ckpt_dir)]))
-ckpt_dir = './'
-test_ckpts = ['CCCCCC_512_10dB_597']
+
+test_ckpts = [
+	'CCCCCC_512_10dB_597'
+]
 
 # get checkpoint name from given directory (without extensions)
 
@@ -75,6 +77,7 @@ test_ds = prepare_dataset()
 def psnr(y_true, y_pred):
 	return tf.image.psnr(y_true, y_pred, max_val=1)
 
+#%%
 f = open('cossim.csv', 'w', newline='')
 csv_writer = csv.writer(f)
 
@@ -94,7 +97,7 @@ for idx, ckpt_name in enumerate(test_ckpts):
 		has_gdn=has_gdn,
 		num_symbols=int(num_symbols),
 		snrdB=int(snr_trained[:-2]),
-		channel='AWGN'
+		channel='Rician'
 	)
 	model.load_weights(f'{ckpt_dir}/{ckpt_name}').expect_partial()
 
