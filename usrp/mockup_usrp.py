@@ -1,11 +1,11 @@
 # Mockup USRP
 # just relay constellations from receive UDP socket to send UDP socket
-from socket import *
+import socket
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 from config.train_config import USRP_HOST, USRP_PORT, RCV_ADDR, RCV_PORT
-from utils.networking import receive_constellation_udp, send_constellation_udp
+from utils import receive_constellation_udp, send_constellation_udp
 from time import sleep
 
 send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

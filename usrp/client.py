@@ -1,5 +1,5 @@
 #%%
-from socket import *
+import socket
 import cv2
 import matplotlib.pyplot as plt
 import PIL.Image as pilimg
@@ -22,7 +22,7 @@ TARGET_JPEG_RATE = 2048
 # 32768 / 4 / 4 (=4 QPSK symbols/bytes) ~ 2048 Bytes
 
 BUFF_SIZE = 4096
-clientSock = socket(AF_INET, SOCK_STREAM)
+clientSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 clientSock.connect(('127.0.0.1', 8080))
 
 # Construct sockets
@@ -64,7 +64,7 @@ constellations = np.load('constellations.npz')['constellations']
 # Send/receive constellations CONCURRENTLY (to USRP)
 send_constellation_udp(constellations.tobytes(), send_sock, send_addr)
 data = receive_constellation_udp(rcv_sock)
-rcv_iq = compensate_signal(data)
+rcv_iq, raw_i, raw_q = compensate_signal(data)
 
 # Send channel corrupted (I/Q compensated) constellations (=rcv_iq)
 np.savez_compressed('rcv_iq.npz', rcv_iq=rcv_iq)

@@ -1,4 +1,5 @@
 import numpy as np
+import tensorflow as tf
 
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
@@ -9,7 +10,13 @@ from config.usrp_config import NORMALIZE_CONSTANT
 
 EXPECTED_SAMPLE_SIZE = SAMPLE_SIZE - PILOT_SIZE * 2
 
-def to_constellation_array(i, q, i_pilot=True, q_pilot=True):
+def to_constellation_array(data, i_pilot=True, q_pilot=True):
+  # data: numpy array
+  i = data[:,:,0].flatten()
+  q = data[:,:,1].flatten()
+  i = np.clip(i / NORMALIZE_CONSTANT * 32767, -32767, 32767)
+  q = np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)
+
   i_start_pilot = p_start_i if i_pilot else np.zeros(len(p_start_i))
   i_end_pilot = p_end_i if i_pilot else np.zeros(len(p_end_i))
   q_start_pilot = p_start_q if q_pilot else np.zeros(len(p_start_q))
@@ -27,6 +34,11 @@ def to_constellation_array(i, q, i_pilot=True, q_pilot=True):
 
 
 def get_lci_lcq_compensation(rcv_sock, rcv_addr, send_sock, send_addr):
+	# Get leakage compensation constant
+	# Leakage model: 
+	# ihat = LCI * q + i
+	# qhat = LCQ * i + q
+
   # Send LCI message
   x = np.linspace(0, 4 * 2 * np.pi, SAMPLE_SIZE - 2*PILOT_SIZE)
   i = 0 * np.cos(x) * 32767
@@ -156,5 +168,5 @@ def compensate_signal(data, LCI, LCQ):
   rcv_iq[:, 0] = ihat * max_i
   rcv_iq[:, 1] = qhat * max_q
 
-  return rcv_iq
+  return rcv_iq, raw_i, raw_q
 

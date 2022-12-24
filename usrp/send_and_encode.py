@@ -14,9 +14,11 @@ import os
 
 from models.model import SemViT_Encoder_Only
 from utils.datasets import dataset_generator
-from config.train_config import USRP_HOST, USRP_PORT, NORMALIZE_CONSTANT
-
-from usrp.pilot import p_start_i, p_end_i, p_start_q, p_end_q, PILOT_SIZE, SAMPLE_SIZE
+from utils.image import imBatchtoImage
+from utils.usrp_utils import to_constellation_array
+from utils.networking import send_constellation_udp
+from config.usrp_config import USRP_HOST, USRP_PORT, NORMALIZE_CONSTANT
+from usrp.pilot import p_start_i, p_end_i, p_start_q, p_end_q
 
 ################## CONFIG ####################
 ARCH = 'CCVVCC'
@@ -50,22 +52,6 @@ SNR         Mod.    Rate    Fair JPEG Bytes
 19.5 ~      64QAM   7/8     21504
 '''
 ##############################################
-
-def imBatchtoImage(batch_images):
-    '''
-    turns b, 32, 32, 3 images into single sqrt(b) * 32, sqrt(b) * 32, 3 image.
-    '''
-    batch, h, w, c = batch_images.shape
-    b = int(batch ** 0.5)
-
-    divisor = b
-    while batch % divisor != 0:
-        divisor -= 1
-    
-    image = tf.reshape(batch_images, (-1, batch//divisor, h, w, c))
-    image = tf.transpose(image, [0, 2, 1, 3, 4])
-    image = tf.reshape(image, (-1, batch//divisor*w, c))
-    return image
 
 encoder_network = SemViT_Encoder_Only(
 	ARCH,
@@ -102,29 +88,20 @@ else:
     # for CIFAR-100
     images = next(iter(test_ds))[0]
 
-
-send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-send_addr = (USRP_HOST, USRP_PORT)
+tf.keras.utils.save_img(f'./results/source.png', imBatchtoImage(images))
 
 data = encoder_network(images)
 
-i = tf.reshape(data[:,:,0], shape=(-1,))
-q = tf.reshape(data[:,:,1], shape=(-1,))
+send_data = to_constellation_array(data.numpy())
+send_data = send_data.tobytes()
+send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+send_addr = (USRP_HOST, USRP_PORT)
+send_constellation_udp(send_data, send_sock, send_addr)
 
-# plt.title('In-phase')
-# plt.plot(i)
-# plt.show()
-
-# plt.title('Q-phase')
-# plt.plot(q)
-# plt.show()
-
-i = i / NORMALIZE_CONSTANT
-q = q / NORMALIZE_CONSTANT
-
+i = tf.reshape(data[:,:,0], shape=(-1,)) / NORMALIZE_CONSTANT
+q = tf.reshape(data[:,:,1], shape=(-1,)) / NORMALIZE_CONSTANT
 max_i = np.max(i)
 max_q = np.max(q)
-
 pwr = np.mean(i ** 2 + q ** 2)
 
 plt.title('Constellations')
@@ -133,30 +110,6 @@ plt.xlim([-1, 1])
 plt.ylim([-1, 1])
 plt.show()
 plt.savefig('./results/sent_constellations.png', dpi=100)
-
-i *=  32767
-q *=  32767
-
-i = tf.clip_by_value(i, -32767, 32767)
-q = tf.clip_by_value(q, -32767, 32767)
-
-
-p_i = np.concatenate([p_start_i, i, p_end_i]).astype(np.int16)
-p_q = np.concatenate([p_start_q, q, p_end_q]).astype(np.int32)
-
-i_ = p_i
-q_ = np.left_shift(p_q, 16)
-data = np.bitwise_or(q_, i_.view(dtype=np.uint16)).byteswap(inplace=True)
-
-send_data = data.tobytes()
-
-SEND_SOCK_BUFF_SIZE = 256
-
-tf.keras.utils.save_img(f'./results/source.png', imBatchtoImage(images))
-
-for j in range(0, len(send_data), SEND_SOCK_BUFF_SIZE):
-    _data = send_data[j:min(len(send_data), j + SEND_SOCK_BUFF_SIZE)]
-    send_sock.sendto(_data, send_addr)
 
 print(f'SEND DONE. # Constellations: {len(data)}, ' \
       f'max_i: {max_i:.2f}, max_q: {max_q:.2f}, pwr: {pwr:.2f}')

@@ -1,5 +1,5 @@
 #%%
-from socket import *
+import socket
 import matplotlib.pyplot as plt
 import PIL.Image as pilimg
 import numpy as np
@@ -34,7 +34,7 @@ encoder_network.load_weights(CKPT_NAME).expect_partial()
 decoder_network.load_weights(CKPT_NAME).expect_partial()
 
 # Server thing
-serverSock = socket(AF_INET, SOCK_STREAM)
+serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serverSock.bind(('', 8080))
 print('Listening')
 serverSock.listen(1)
@@ -64,11 +64,7 @@ while True:
   images = tf.reshape(images, (-1, 32, 32, c))
 
   data = encoder_network(images)
-  i = tf.reshape(data[:,:,0], shape=(-1,))
-  q = tf.reshape(data[:,:,1], shape=(-1,))
-  i = tf.clip_by_value(i / NORMALIZE_CONSTANT * 32767, -32767, 32767)
-  q = tf.clip_by_value(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)
-  constellations = to_constellation_array(i, q, i_pilot=True, q_pilot=False)
+  constellations = to_constellation_array(data, i_pilot=True, q_pilot=False)
 
   # Send constellations
   np.savez_compressed('constellations.npz', constellations=constellations)
