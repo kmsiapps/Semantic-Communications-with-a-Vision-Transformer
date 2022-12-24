@@ -45,7 +45,7 @@ class SemViT(tf.keras.Model):
         elif channel == 'AWGN':
             self.channel = AWGNChannel(snrdB)
         elif channel == 'Rician':
-            self.channel = RicianChannel(snrdB)
+            self.channel = RicianChannel(snrdB, k=2)
         else:
             self.channel = tf.identity
 
