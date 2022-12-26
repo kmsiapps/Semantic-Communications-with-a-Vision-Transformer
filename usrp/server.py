@@ -20,7 +20,7 @@ from config.usrp_config import NORMALIZE_CONSTANT, TEMP_DIRECTORY
 
 ARCH = 'CCVVCC'
 NUM_SYMBOLS = 512
-CKPT_NAME = '../ckpt/CCVVCC_512_15dB_585'
+CKPT_NAME = '../bkup_ckpt/best/awgn/CCVVCC_512_15dB_585'
 TARGET_JPEG_RATE = 2048
 
 encoder_network = SemViT_Encoder_Only(
@@ -46,7 +46,7 @@ if not os.path.exists(TEMP_DIRECTORY):
 
 # Server thing
 serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-serverSock.bind(('', 8080))
+serverSock.bind(('0.0.0.0', 8080))
 print('Listening')
 serverSock.listen(1)
 
@@ -62,7 +62,7 @@ while True:
   plt.show()
 
   # Encode image
-  images = tf.convert_to_tensor(images, dtype=tf.float32) / 255.0
+  images = tf.convert_to_tensor(np.array(images), dtype=tf.float32) / 255.0
   h, w, c = images.shape
   images = tf.reshape(images, (1, h, w, c))
 
