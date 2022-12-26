@@ -53,53 +53,57 @@ serverSock.listen(1)
 while True:
   print('Waiting')
   clientSock, addr = serverSock.accept()
-  print(f'Connection: {str(addr)}')
 
-  # Receive image
-  receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/cam_received.png')
-  images = pilimg.open(f'{TEMP_DIRECTORY}/cam_received.png').convert('RGB')
-  plt.imshow(images)
-  plt.show()
+  try:
+    print(f'Connection: {str(addr)}')
 
-  # Encode image
-  images = tf.convert_to_tensor(np.array(images), dtype=tf.float32) / 255.0
-  h, w, c = images.shape
-  images = tf.reshape(images, (1, h, w, c))
+    # Receive image
+    receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/cam_received.png')
+    images = pilimg.open(f'{TEMP_DIRECTORY}/cam_received.png').convert('RGB')
+    plt.imshow(images)
+    plt.show()
 
-  images = tf.image.extract_patches(
-      images,
-      sizes=[1, 32, 32, 1],
-      strides=[1, 32, 32, 1],
-      rates=[1, 1, 1, 1],
-      padding='VALID'
-  )
-  images = tf.reshape(images, (-1, 32, 32, c))
+    # Encode image
+    images = tf.convert_to_tensor(np.array(images), dtype=tf.float32) / 255.0
+    h, w, c = images.shape
+    images = tf.reshape(images, (1, h, w, c))
 
-  data = encoder_network(images)
-  i = data[:,:,0].numpy().flatten()
-  q = data[:,:,1].numpy().flatten()
-  i = np.clip(i / NORMALIZE_CONSTANT * 32767, -32767, 32767)
-  q = np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)
-  constellations = to_constellation_array(i, q, i_pilot=True, q_pilot=True)
+    images = tf.image.extract_patches(
+        images,
+        sizes=[1, 32, 32, 1],
+        strides=[1, 32, 32, 1],
+        rates=[1, 1, 1, 1],
+        padding='VALID'
+    )
+    images = tf.reshape(images, (-1, 32, 32, c))
 
-  # Send constellations
-  np.savez_compressed(f'{TEMP_DIRECTORY}/constellations.npz', constellations=constellations)
-  send_binary(clientSock, f'{TEMP_DIRECTORY}/constellations.npz')
+    data = encoder_network(images)
+    i = data[:,:,0].numpy().flatten()
+    q = data[:,:,1].numpy().flatten()
+    i = np.clip(i / NORMALIZE_CONSTANT * 32767, -32767, 32767)
+    q = np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)
+    constellations = to_constellation_array(i, q, i_pilot=True, q_pilot=True)
 
-  # Receive rcv_iq.npz file and decode
-  receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/rcv_iq.npz')
-  rcv_iq = np.load(f'{TEMP_DIRECTORY}/rcv_iq.npz')['rcv_iq']
+    # Send constellations
+    np.savez_compressed(f'{TEMP_DIRECTORY}/constellations.npz', constellations=constellations)
+    send_binary(clientSock, f'{TEMP_DIRECTORY}/constellations.npz')
 
-  # Decode constellations
-  rcv_iq = tf.cast(tf.convert_to_tensor(rcv_iq), tf.float32)
-  rcv_iq = tf.reshape(rcv_iq, (BATCH_SIZE, -1, 2))
-  proposed_result = decoder_network(rcv_iq)
-  tf.keras.utils.save_img(f'{TEMP_DIRECTORY}/decoded_image.png', imBatchtoImage(proposed_result))
+    # Receive rcv_iq.npz file and decode
+    receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/rcv_iq.npz')
+    rcv_iq = np.load(f'{TEMP_DIRECTORY}/rcv_iq.npz')['rcv_iq']
 
-  # Send image
-  send_binary(clientSock, f'{TEMP_DIRECTORY}/decoded_image.png')
+    # Decode constellations
+    rcv_iq = tf.cast(tf.convert_to_tensor(rcv_iq), tf.float32)
+    rcv_iq = tf.reshape(rcv_iq, (BATCH_SIZE, -1, 2))
+    proposed_result = decoder_network(rcv_iq)
+    tf.keras.utils.save_img(f'{TEMP_DIRECTORY}/decoded_image.png', imBatchtoImage(proposed_result))
 
-  # TODO: Send effective SNR
+    # Send image
+    send_binary(clientSock, f'{TEMP_DIRECTORY}/decoded_image.png')
+
+    # TODO: Send effective SNR
+  except:
+    clientSock.close()
 
 
 # %%
