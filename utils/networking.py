@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from usrp.pilot import PILOT_SIZE, SAMPLE_SIZE
 
 BUFF_SIZE = 4096
-SEND_SOCK_BUFF_SIZE = 4096
+SEND_SOCK_BUFF_SIZE = 256
 SOCK_BUFF_SIZE = 16384 # EXPECTED_DATA_LENGTH * 4 + 4
 METADATA_BYTES = 4
 
@@ -87,4 +87,4 @@ def send_constellation_udp(send_data, send_sock, send_addr):
   for j in range(0, len(send_data), SEND_SOCK_BUFF_SIZE):
     _data = send_data[j:min(len(send_data), j + SEND_SOCK_BUFF_SIZE)]
     send_sock.sendto(_data, send_addr)
-    time.sleep(0.01)
+    time.sleep(0.001)
