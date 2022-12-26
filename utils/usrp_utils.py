@@ -1,5 +1,5 @@
 import numpy as np
-import tensorflow as tf
+import struct
 
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
@@ -10,13 +10,8 @@ from config.usrp_config import NORMALIZE_CONSTANT
 
 EXPECTED_SAMPLE_SIZE = SAMPLE_SIZE - PILOT_SIZE * 2
 
-def to_constellation_array(data, i_pilot=True, q_pilot=True):
+def to_constellation_array(i, q, i_pilot=True, q_pilot=True):
   # data: numpy array
-  i = data[:,:,0].flatten()
-  q = data[:,:,1].flatten()
-  i = np.clip(i / NORMALIZE_CONSTANT * 32767, -32767, 32767)
-  q = np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)
-
   i_start_pilot = p_start_i if i_pilot else np.zeros(len(p_start_i))
   i_end_pilot = p_end_i if i_pilot else np.zeros(len(p_end_i))
   q_start_pilot = p_start_q if q_pilot else np.zeros(len(p_start_q))
@@ -47,6 +42,7 @@ def get_lci_lcq_compensation(rcv_sock, rcv_addr, send_sock, send_addr):
   data = to_constellation_array(i, q, i_pilot=False, q_pilot=True)
   send_data = data.tobytes()
   send_constellation_udp(send_data, send_sock, send_addr)
+  print('LCI send done. Receiving LCI response')
 
   # Receive LCI message
   data = receive_constellation_udp(rcv_sock)
@@ -58,18 +54,18 @@ def get_lci_lcq_compensation(rcv_sock, rcv_addr, send_sock, send_addr):
 
   pilot_mask_q = np.concatenate([p_start_q, np.zeros(EXPECTED_SAMPLE_SIZE), p_end_q])
   start_idx = np.argmax(np.abs(np.correlate(raw_q, pilot_mask_q))) + PILOT_SIZE
-
   # get noise & zero-mean normalize
   LCI = np.mean(raw_i[start_idx:start_idx+EXPECTED_SAMPLE_SIZE] / (raw_q[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]+0.0001))
 
   # Send LCQ message
-  x = np.linspace(0, 4 * 2 * np.pi, SAMPLE_SIZE - 2*PILOT_SIZE)
+  x = np.linspace(0, (4 * 2) * np.pi, SAMPLE_SIZE - 2*PILOT_SIZE)
   i = 1 * np.cos(x) * 32767
   q = 0 * np.sin(x) * 32767
 
   data = to_constellation_array(i, q, i_pilot=True, q_pilot=False)
   send_data = data.tobytes()
   send_constellation_udp(send_data, send_sock, send_addr)
+  print('LCI send done. Receiving LCQ response')
 
   # Receive LCQ message
   data = receive_constellation_udp(rcv_sock)

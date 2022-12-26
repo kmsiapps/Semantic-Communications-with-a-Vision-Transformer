@@ -8,3 +8,5 @@ checkpoint
 logs/
 *.csv
 *.sh
+usrp/temp
+usrp/*.png
