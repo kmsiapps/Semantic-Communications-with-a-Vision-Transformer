@@ -12,18 +12,19 @@ import PIL.Image as pilimg
 import matplotlib.pyplot as plt
 import os
 
+import sys, os
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from models.model import SemViT_Encoder_Only
 from utils.datasets import dataset_generator
 from utils.image import imBatchtoImage
 from utils.usrp_utils import to_constellation_array
 from utils.networking import send_constellation_udp
-from config.usrp_config import USRP_HOST, USRP_PORT, NORMALIZE_CONSTANT
-from usrp.pilot import p_start_i, p_end_i, p_start_q, p_end_q
+from config.usrp_config import USRP_HOST, USRP_PORT, NORMALIZE_CONSTANT, TEMP_DIRECTORY
 
 ################## CONFIG ####################
 ARCH = 'CCVVCC'
 NUM_SYMBOLS = 512
-CKPT_NAME = './ckpt/CCVVCC_512_0dB_592'
+CKPT_NAME = '../ckpt/CCVVCC_512_0dB_592'
 HAS_GDN = False
 
 TARGET_JPEG_RATE = 2048
@@ -88,11 +89,15 @@ else:
     # for CIFAR-100
     images = next(iter(test_ds))[0]
 
-tf.keras.utils.save_img(f'./results/source.png', imBatchtoImage(images))
+tf.keras.utils.save_img(f'{TEMP_DIRECTORY}/source.png', imBatchtoImage(images))
 
 data = encoder_network(images)
+i = data[:,:,0].numpy().flatten()
+q = data[:,:,1].numpy().flatten()
+i = np.clip(i / NORMALIZE_CONSTANT * 32767, -32767, 32767)
+q = np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)
 
-send_data = to_constellation_array(data.numpy())
+send_data = to_constellation_array(i, q, i_pilot=True, q_pilot=True)
 send_data = send_data.tobytes()
 send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 send_addr = (USRP_HOST, USRP_PORT)
@@ -109,7 +114,7 @@ plt.scatter(i, q, s=0.1)
 plt.xlim([-1, 1])
 plt.ylim([-1, 1])
 plt.show()
-plt.savefig('./results/sent_constellations.png', dpi=100)
+plt.savefig(f'{TEMP_DIRECTORY}/sent_constellations.png', dpi=100)
 
 print(f'SEND DONE. # Constellations: {len(data)}, ' \
       f'max_i: {max_i:.2f}, max_q: {max_q:.2f}, pwr: {pwr:.2f}')
@@ -122,8 +127,8 @@ quality = 50
 quality_min = 0
 
 while True:
-    pil_image.save('./results/source_jpeg.jpg', quality=quality)
-    bytes = os.path.getsize('./results/source_jpeg.jpg')
+    pil_image.save(f'{TEMP_DIRECTORY}/source_jpeg.jpg', quality=quality)
+    bytes = os.path.getsize(f'{TEMP_DIRECTORY}/source_jpeg.jpg')
     if quality == 0 or quality == quality_min or quality == quality_max:
         break
     elif bytes > TARGET_JPEG_RATE and quality_min != quality - 1:

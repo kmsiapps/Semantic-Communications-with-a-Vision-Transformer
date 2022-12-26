@@ -1,6 +1,7 @@
 import numpy as np
 import struct
 
+import multiprocessing
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
@@ -28,6 +29,11 @@ def to_constellation_array(i, q, i_pilot=True, q_pilot=True):
   return data
 
 
+def rcv_worker(rcv_sock, ret_dict):
+  data = receive_constellation_udp(rcv_sock)
+  ret_dict['return'] = data
+
+
 def get_lci_lcq_compensation(rcv_sock, rcv_addr, send_sock, send_addr):
 	# Get leakage compensation constant
 	# Leakage model: 
@@ -41,11 +47,21 @@ def get_lci_lcq_compensation(rcv_sock, rcv_addr, send_sock, send_addr):
 
   data = to_constellation_array(i, q, i_pilot=False, q_pilot=True)
   send_data = data.tobytes()
+
+  # Concurrent Send/Receive
+  manager = multiprocessing.Manager()
+  ret_dict = manager.dict()
+  p = multiprocessing.Process(target=rcv_worker, args=(rcv_sock, ret_dict))
+  p.start()
+  time.sleep(1)
+
   send_constellation_udp(send_data, send_sock, send_addr)
   print('LCI send done. Receiving LCI response')
 
   # Receive LCI message
-  data = receive_constellation_udp(rcv_sock)
+  p.join()
+  data = ret_dict['return']
+
   array_length = len(data) // 4
   d_iq = struct.unpack('!' + 'f' * array_length, data)
 
@@ -64,11 +80,19 @@ def get_lci_lcq_compensation(rcv_sock, rcv_addr, send_sock, send_addr):
 
   data = to_constellation_array(i, q, i_pilot=True, q_pilot=False)
   send_data = data.tobytes()
+
+  # Concurrent Send/Receive
+  ret_dict = manager.dict()
+  p = multiprocessing.Process(target=rcv_worker, args=(rcv_sock, ret_dict))
+  p.start()
+  time.sleep(1)
+
   send_constellation_udp(send_data, send_sock, send_addr)
   print('LCI send done. Receiving LCQ response')
 
   # Receive LCQ message
-  data = receive_constellation_udp(rcv_sock)
+  p.join()
+  data = ret_dict['return']
   array_length = len(data) // 4
   d_iq = struct.unpack('!' + 'f' * array_length, data)
 

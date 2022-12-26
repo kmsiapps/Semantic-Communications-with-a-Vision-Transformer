@@ -26,7 +26,7 @@ def receive_and_save_binary(sock, filename):
       partial_data = sock.recv(BUFF_SIZE)
       data += partial_data
       progress.update(len(partial_data))
-
+  
   with open(filename, 'wb') as f:
     f.write(data)
 
@@ -62,7 +62,9 @@ def receive_constellation_udp(rcv_sock):
           
           if len(rcv_data) >= ARRAY_END:
             data = rcv_data[METADATA_BYTES:ARRAY_END]
-            return data
+            break
+
+  return data
 
 
 def receive_udp(rcv_sock, total_bytes):
@@ -80,7 +82,8 @@ def receive_udp(rcv_sock, total_bytes):
           rcv_data += _data
           progress.update(len(_data))
           if len(rcv_data) >= ARRAY_END:
-            return rcv_data
+            break
+  return rcv_data
 
 
 def send_constellation_udp(send_data, send_sock, send_addr):

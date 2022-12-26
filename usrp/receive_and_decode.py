@@ -16,9 +16,9 @@ import time
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
-from usrp.pilot import p_start_i, p_end_i, p_start_q, p_end_q, PILOT_SIZE, SAMPLE_SIZE
+from usrp.pilot import PILOT_SIZE, SAMPLE_SIZE
 from models.model import SemViT_Encoder_Only, SemViT_Decoder_Only
-from config.usrp_config import RCV_ADDR, RCV_PORT, NORMALIZE_CONSTANT, USRP_HOST, USRP_PORT
+from config.usrp_config import RCV_ADDR, RCV_PORT, NORMALIZE_CONSTANT, USRP_HOST, USRP_PORT, TEMP_DIRECTORY
 from config.train_config import BATCH_SIZE
 from utils.image import imBatchtoImage
 from utils.usrp_utils import get_lci_lcq_compensation, compensate_signal
@@ -37,7 +37,7 @@ EXPECTED_SAMPLE_SIZE = SAMPLE_SIZE - PILOT_SIZE * 2
 
 ARCH = 'CCVVCC'
 NUM_SYMBOLS = 512
-CKPT_NAME = './ckpt/CCVVCC_512_0dB_592'
+CKPT_NAME = '../ckpt/CCVVCC_512_0dB_592'
 HAS_GDN = False
 
 encoder_network = SemViT_Encoder_Only(
@@ -76,13 +76,13 @@ while True:
 	array_length = len(data) // 4
 	rcv_iq, raw_i, raw_q = compensate_signal(data, LCI, LCQ)
 	rcv_iq = tf.cast(tf.convert_to_tensor(rcv_iq), tf.float32)
-	rcv_iq = tf.reshape(rcv_iq, (BATCH_SIZE, -1, 2))
+	rcv_iq = tf.reshape(rcv_iq, (64, -1, 2))
 
 	proposed_result = decoder_network(rcv_iq)
-	tf.keras.utils.save_img(f'./results/proposed_usrp.png', imBatchtoImage(proposed_result))
+	tf.keras.utils.save_img(f'{TEMP_DIRECTORY}/proposed_usrp.png', imBatchtoImage(proposed_result))
 
 	# for groudntruth computation
-	images = pilimg.open('./results/source.png').convert('RGB')
+	images = pilimg.open(f'{TEMP_DIRECTORY}/source.png').convert('RGB')
 	images = tf.convert_to_tensor(images, dtype=tf.float32) / 255.0
 	h, w, c = images.shape
 	images = tf.reshape(images, (1, h, w, c))
@@ -106,9 +106,10 @@ while True:
 	non_error_result = decoder_network(gt)
 	decoding_delay = time.time() - decoding_delay
 
-	tf.keras.utils.save_img(f'./results/proposed_gt.png', imBatchtoImage(non_error_result))
+	tf.keras.utils.save_img(f'{TEMP_DIRECTORY}/proposed_gt.png', imBatchtoImage(non_error_result))
 
 	# error computation
+	rcv_iq = tf.reshape(rcv_iq, (-1, 2))
 	ihat = rcv_iq[:, 0] / NORMALIZE_CONSTANT
 	qhat = rcv_iq[:, 1] / NORMALIZE_CONSTANT
 
@@ -151,7 +152,7 @@ while True:
 	ax[1].set_title(f'Proposed\nPSNR: {psnr:.2f} dB\nSSIM: {ssim:.2f}')
 	ax[1].imshow(imBatchtoImage(proposed_result).numpy())
 	
-	image_jpeg = pilimg.open('./results/source_jpeg.jpg').convert('RGB')
+	image_jpeg = pilimg.open(f'{TEMP_DIRECTORY}/source_jpeg.jpg').convert('RGB')
 	image_jpeg = tf.convert_to_tensor(image_jpeg, dtype=tf.float32) / 255.0
 	h, w, c = image_jpeg.shape
 	image_jpeg = tf.reshape(image_jpeg, (1, h, w, c))

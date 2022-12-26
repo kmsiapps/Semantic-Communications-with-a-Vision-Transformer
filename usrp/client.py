@@ -4,14 +4,16 @@ import cv2
 import matplotlib.pyplot as plt
 import PIL.Image as pilimg
 import numpy as np
+import multiprocessing
+import time
 
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from utils.networking import receive_and_save_binary, send_binary, send_constellation_udp, receive_constellation_udp
-from utils.usrp_utils import get_lci_lcq_compensation, compensate_signal
+from utils.usrp_utils import get_lci_lcq_compensation, compensate_signal, rcv_worker
 from config.usrp_config import USRP_HOST, USRP_PORT, RCV_ADDR, RCV_PORT, TEMP_DIRECTORY
 
-TARGET_IMAGE = 'cifar.png'
+TARGET_IMAGE = 'celeb.png'
 TARGET_JPEG_RATE = 2048
 # Our encoder produces 512 constellations per 32 x 32 patch
 # so for 256 * 256 image,
@@ -27,7 +29,7 @@ if not os.path.exists(TEMP_DIRECTORY):
 
 BUFF_SIZE = 4096
 clientSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-clientSock.connect(('', 8080))
+clientSock.connect(('1.233.219.33', 8080))
 print('Connected')
 
 # Construct sockets
@@ -69,8 +71,16 @@ receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/constellations.npz')
 constellations = np.load(f'{TEMP_DIRECTORY}/constellations.npz')['constellations']
 
 # Send/receive constellations CONCURRENTLY (to USRP)
+manager = multiprocessing.Manager()
+ret_dict = manager.dict()
+p = multiprocessing.Process(target=rcv_worker, args=(rcv_sock, ret_dict))
+p.start()
+time.sleep(1)
+
 send_constellation_udp(constellations.tobytes(), send_sock, send_addr)
-data = receive_constellation_udp(rcv_sock)
+
+p.join()
+data = ret_dict['return']
 rcv_iq, raw_i, raw_q = compensate_signal(data, LCI, LCQ)
 
 # Send channel corrupted (I/Q compensated) constellations (=rcv_iq)
