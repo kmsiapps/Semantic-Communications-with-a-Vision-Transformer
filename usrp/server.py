@@ -104,8 +104,12 @@ while True:
     # Receive rcv_iq.npz file and decode
     receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/rcv_iq.npz')
     rcv_iq = np.load(f'{TEMP_DIRECTORY}/rcv_iq.npz')['rcv_iq']
-    rcv_i = rcv_iq[:, 0] / NORMALIZE_CONSTANT
-    rcv_q = rcv_iq[:, 1] / NORMALIZE_CONSTANT
+    rcv_i = np.right_shift(np.left_shift(rcv_iq, 16), 16).astype('>f4') * NORMALIZE_CONSTANT / 32767
+    rcv_q = np.right_shift(rcv_iq, 16).astype('>f4') * NORMALIZE_CONSTANT / 32767
+    
+    rcv_iq = np.zeros((len(rcv_i), 2), dtype=np.float32)
+    rcv_iq[:, 0] = rcv_i
+    rcv_iq[:, 1] = rcv_q
 
     # Decode constellations
     rcv_iq = tf.cast(tf.convert_to_tensor(rcv_iq), tf.float32)

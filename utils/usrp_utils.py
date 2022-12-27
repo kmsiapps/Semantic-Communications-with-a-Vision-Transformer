@@ -181,12 +181,9 @@ def compensate_signal(data, LCI, LCQ):
   # plt.plot(qhat)
   # plt.show()
 
-  max_i = NORMALIZE_CONSTANT
-  max_q = NORMALIZE_CONSTANT
-
-  rcv_iq = np.zeros(shape=(len(ihat), 2))
-  rcv_iq[:, 0] = ihat * max_i
-  rcv_iq[:, 1] = qhat * max_q
+  ihat = np.clip((ihat * 32767).astype(np.int32), -32767, 32767)
+  qhat = np.clip((qhat * 32767).astype(np.int32), -32767, 32767)
+  rcv_iq = to_constellation_array(ihat, qhat, i_pilot=False, q_pilot=False)[PILOT_SIZE:-PILOT_SIZE].byteswap()
 
   return rcv_iq, raw_i, raw_q
 
