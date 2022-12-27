@@ -67,8 +67,8 @@ while True:
     if use_cache:
       constellations = np.load(f'cifar_constellations.npz')['constellations']
       data = constellations[PILOT_SIZE:-PILOT_SIZE].byteswap()
-      i = np.right_shift(np.left_shift(data, 16), 16).astype('>f4') / 32767
-      q = np.right_shift(data, 16).astype('>f4') / 32767
+      i = np.right_shift(np.left_shift(data, 16), 16).astype('>f4')
+      q = np.right_shift(data, 16).astype('>f4')
     else:
       # Receive image
       receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/cam_received.png')
@@ -117,6 +117,8 @@ while True:
     send_binary(clientSock, f'{TEMP_DIRECTORY}/decoded_image.png')
 
     # Send effective SNR
+    i = i / 32767
+    q = q / 32767
     noise_power = (rcv_i - i) ** 2 + (rcv_q - q) ** 2
     signal_power = i ** 2 + q ** 2
     effective_snr = 10 * math.log10(tf.reduce_mean(signal_power / (0.001 + noise_power)))
