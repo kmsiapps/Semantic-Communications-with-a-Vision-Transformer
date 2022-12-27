@@ -6,6 +6,7 @@ import PIL.Image as pilimg
 import numpy as np
 import multiprocessing
 import time
+import struct
 
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
@@ -13,7 +14,6 @@ from utils.networking import receive_and_save_binary, send_binary, send_constell
 from utils.usrp_utils import get_lci_lcq_compensation, compensate_signal, rcv_worker
 from config.usrp_config import USRP_HOST, USRP_PORT, RCV_ADDR, RCV_PORT, TEMP_DIRECTORY
 
-TARGET_IMAGE = 'cam.png'
 TARGET_JPEG_RATE = 2048
 # Our encoder produces 512 constellations per 32 x 32 patch
 # so for 256 * 256 image,
@@ -41,33 +41,51 @@ if __name__ == '__main__':
     send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     send_addr = (USRP_HOST, USRP_PORT)
 
+    demo_type = int(input("Select image type: CIFAR (0) vs CELEB (1) vs CAM (2)?: "))
+    use_cache = False
+
+    if demo_type == 0:
+        TARGET_IMAGE = 'cifar.png'
+        use_cache = (int(input("Use cached constellation (0/1)? ")) == 1)
+    elif demo_type == 1:
+        TARGET_IMAGE = 'celeb.png'
+    else:
     # Webcam capture
-    cam = cv2.VideoCapture(0)
-    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 800)
-    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 600)
+        cam = cv2.VideoCapture(0)
+        cam.set(cv2.CAP_PROP_FRAME_WIDTH, 800)
+        cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 600)
 
-    while True:
-        check, frame = cam.read()
-        cv2.imshow('video', frame)
-        key = cv2.waitKey(1)
-        if key == 27:
-            image = frame[:, 100:-100, :]
-            image = cv2.resize(image, (256, 256))
-            cv2.imwrite('cam.png', image)
-            break
+        while True:
+            check, frame = cam.read()
+            cv2.imshow('video', frame)
+            key = cv2.waitKey(1)
+            if key == 27:
+                image = frame[:, 100:-100, :]
+                image = cv2.resize(image, (256, 256))
+                cv2.imwrite('cam.png', image)
+                break
 
-    cam.release()
-    cv2.destroyAllWindows()
+        cam.release()
+        cv2.destroyAllWindows()
+        TARGET_IMAGE = 'cam.png'
 
-    # IQ compensations (optional)
+    print('Image type:', demo_type, 'cache:', use_cache)
+
+    # IQ compensations
     LCI, LCQ = get_lci_lcq_compensation(rcv_sock, rcv_addr, send_sock, send_addr)
 
-    # Send image
-    send_binary(clientSock, TARGET_IMAGE)
+    # Tell the server whether we will use cached one
+    clientSock.send(int(use_cache).to_bytes(length=4, byteorder='big', signed=False))
 
-    # Receive constellations (from HOST)
-    receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/constellations.npz')
-    constellations = np.load(f'{TEMP_DIRECTORY}/constellations.npz')['constellations']
+    if use_cache:
+        constellations = np.load(f'cifar_constellations.npz')['constellations']
+    else:
+        # Send image
+        send_binary(clientSock, TARGET_IMAGE)
+
+        # Receive constellations (from HOST)
+        receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/constellations.npz')
+        constellations = np.load(f'{TEMP_DIRECTORY}/constellations.npz')['constellations']
 
     # Send/receive constellations CONCURRENTLY (to USRP)
     manager = multiprocessing.Manager()
@@ -89,7 +107,9 @@ if __name__ == '__main__':
     # Receive decoded image
     receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/decoded.png')
 
-    # TODO: receive effective SNR
+    # receive effective SNR
+    SNRdB = struct.unpack('!f', clientSock.recv(4))[0]
+    print(f'Effective SNR: {SNRdB:.2f} dB')
 
     # TODO: plot
     fig, ax = plt.subplots(1, 3)

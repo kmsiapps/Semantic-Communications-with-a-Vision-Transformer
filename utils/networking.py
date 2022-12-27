@@ -14,7 +14,7 @@ METADATA_BYTES = 4
 
 def receive_and_save_binary(sock, filename):
   data = b''
-  partial_data = sock.recv(BUFF_SIZE)
+  partial_data = sock.recv(4)
   size, *_ = struct.unpack(
     'I',
     partial_data[:4]
@@ -23,7 +23,7 @@ def receive_and_save_binary(sock, filename):
 
   with tqdm(initial=len(data), total=size) as progress:
     while len(data) < size:
-      partial_data = sock.recv(BUFF_SIZE)
+      partial_data = sock.recv(min(BUFF_SIZE, size - len(data)))
       data += partial_data
       progress.update(len(partial_data))
   
@@ -42,12 +42,13 @@ def send_binary(sock, filename):
 def receive_constellation_udp(rcv_sock):
   rcv_data = bytes()
   _data = bytes()
+  ARRAY_END = 2 * SOCK_BUFF_SIZE # some initial value
   read_header = False
   with tqdm(initial=0, total=100) as progress:
     while True:
         rcv = True
         try:
-          _data, _ = rcv_sock.recvfrom(SOCK_BUFF_SIZE)
+          _data, _ = rcv_sock.recvfrom(min(SOCK_BUFF_SIZE, ARRAY_END-len(rcv_data)))
         except socket.timeout:
           rcv = False
         if rcv:
@@ -75,7 +76,7 @@ def receive_udp(rcv_sock, total_bytes):
     while True:
         rcv = True
         try:
-          _data, _ = rcv_sock.recvfrom(SOCK_BUFF_SIZE)
+          _data, _ = rcv_sock.recvfrom(min(SOCK_BUFF_SIZE, ARRAY_END-len(rcv_data)))
         except socket.timeout:
           rcv = False
         if rcv:

@@ -10,3 +10,4 @@ logs/
 *.sh
 usrp/temp
 usrp/*.png
+usrp/*.npz

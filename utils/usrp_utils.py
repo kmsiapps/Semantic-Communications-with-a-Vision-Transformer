@@ -88,7 +88,7 @@ def get_lci_lcq_compensation(rcv_sock, rcv_addr, send_sock, send_addr):
   time.sleep(1)
 
   send_constellation_udp(send_data, send_sock, send_addr)
-  print('LCI send done. Receiving LCQ response')
+  print('LCQ send done. Receiving LCQ response')
 
   # Receive LCQ message
   p.join()
