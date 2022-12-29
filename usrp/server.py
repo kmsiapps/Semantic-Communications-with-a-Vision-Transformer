@@ -121,8 +121,8 @@ while True:
     send_binary(clientSock, f'{TEMP_DIRECTORY}/decoded_image.png')
 
     # Send effective SNR
-    i = i / 32767
-    q = q / 32767
+    i = i / 32767 * NORMALIZE_CONSTANT
+    q = q / 32767 * NORMALIZE_CONSTANT
     noise_power = (rcv_i - i) ** 2 + (rcv_q - q) ** 2
     signal_power = i ** 2 + q ** 2
     effective_snr = 10 * math.log10(tf.reduce_mean(signal_power / (0.001 + noise_power)))
