@@ -1,0 +1,14 @@
+__pycache__/
+results/
+ckpt/
+bkup_logs/
+bkup_ckpt/
+ckpt_timeseries/
+checkpoint
+logs/
+*.csv
+*.sh
+usrp/temp
+usrp/*.png
+usrp/*.npz
+checkpoint
