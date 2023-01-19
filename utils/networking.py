@@ -39,56 +39,30 @@ def send_binary(sock, filename):
     sock.send(data)
 
 
-def receive_constellation_udp(rcv_sock):
+def receive_constellation_tcp(rcv_sock):
   rcv_data = bytes()
   _data = bytes()
   ARRAY_END = 2 * SOCK_BUFF_SIZE # some initial value
   read_header = False
   with tqdm(initial=0, total=100) as progress:
     while True:
-        rcv = True
-        try:
-          _data, _ = rcv_sock.recvfrom(min(SOCK_BUFF_SIZE, ARRAY_END-len(rcv_data)))
-        except socket.timeout:
-          rcv = False
-        if rcv:
-          if not read_header:
-            array_length = int.from_bytes(_data[:METADATA_BYTES], byteorder='big')
-            ARRAY_END = array_length * 4 + METADATA_BYTES
-            read_header = True
-            progress.reset(total=ARRAY_END)
-            progress.update(len(_data))
-          rcv_data += _data
+      rcv = True
+      try:
+        _data = rcv_sock.recv(min(SOCK_BUFF_SIZE, ARRAY_END-len(rcv_data)))
+      except socket.timeout:
+        rcv = False
+      if rcv:
+        if not read_header:
+          array_length = int.from_bytes(_data[:METADATA_BYTES], byteorder='big')
+          ARRAY_END = array_length * 4 + METADATA_BYTES
+          read_header = True
+          progress.reset(total=ARRAY_END)
           progress.update(len(_data))
-          
-          if len(rcv_data) >= ARRAY_END:
-            data = rcv_data[METADATA_BYTES:ARRAY_END]
-            break
-
+        rcv_data += _data
+        progress.update(len(_data))
+        
+        if len(rcv_data) >= ARRAY_END:
+          data = rcv_data[METADATA_BYTES:ARRAY_END]
+          break
   return data
 
-
-def receive_udp(rcv_sock, total_bytes):
-  rcv_data = bytes()
-  _data = bytes()
-  ARRAY_END = total_bytes
-  with tqdm(initial=0, total=total_bytes) as progress:
-    while True:
-        rcv = True
-        try:
-          _data, _ = rcv_sock.recvfrom(min(SOCK_BUFF_SIZE, ARRAY_END-len(rcv_data)))
-        except socket.timeout:
-          rcv = False
-        if rcv:
-          rcv_data += _data
-          progress.update(len(_data))
-          if len(rcv_data) >= ARRAY_END:
-            break
-  return rcv_data
-
-
-def send_constellation_udp(send_data, send_sock, send_addr):
-  for j in range(0, len(send_data), SEND_SOCK_BUFF_SIZE):
-    _data = send_data[j:min(len(send_data), j + SEND_SOCK_BUFF_SIZE)]
-    send_sock.sendto(_data, send_addr)
-    # time.sleep(0.001)

@@ -4,15 +4,14 @@ import cv2
 import matplotlib.pyplot as plt
 import PIL.Image as pilimg
 import numpy as np
-import multiprocessing
-import time
 import struct
+import time
 from skimage.metrics import structural_similarity, peak_signal_noise_ratio
 
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from utils.networking import receive_and_save_binary, send_binary, send_constellation_udp
-from utils.usrp_utils import get_lci_lcq_compensation, compensate_signal, rcv_worker
+from utils.networking import receive_and_save_binary, send_binary
+from utils.usrp_utils import get_lci_lcq_compensation, compensate_signal, receive_constellation_tcp
 from config.usrp_config import USRP_HOST, USRP_PORT, RCV_ADDR, RCV_PORT, TEMP_DIRECTORY
 
 TARGET_JPEG_RATE = 2048
@@ -28,21 +27,21 @@ TARGET_JPEG_RATE = 2048
 if __name__ == '__main__':
     if not os.path.exists(TEMP_DIRECTORY):
         os.makedirs(TEMP_DIRECTORY)
+    clientSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    clientSock.connect(('1.233.219.33', 8080))
+    print('Connected to server')
+    
+    serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    serverSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    serverSock.bind((RCV_ADDR, RCV_PORT))
+    serverSock.listen(1)
+    print('Waiting')
+    usrpSock, addr = serverSock.accept()
+    print('Connected to USRP:', addr)
 
+    LCI, LCQ = 0, 0
     BUFF_SIZE = 4096
     while True:
-        clientSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        clientSock.connect(('1.233.219.33', 8080))
-        print('Connected')
-
-        # Construct sockets
-        rcv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        rcv_addr = (RCV_ADDR, RCV_PORT)
-        rcv_sock.bind(rcv_addr)
-        # rcv_sock.settimeout(2)
-        send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        send_addr = (USRP_HOST, USRP_PORT)
-
         demo_type = int(input("Select image type: CIFAR (0) vs CELEB (1) vs CAM (2)?: "))
         use_cache = False
 
@@ -53,7 +52,7 @@ if __name__ == '__main__':
             TARGET_IMAGE = 'celeb.png'
         else:
         # Webcam capture
-            cam = cv2.VideoCapture(0)
+            cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
             cam.set(cv2.CAP_PROP_FRAME_WIDTH, 800)
             cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 600)
 
@@ -74,7 +73,7 @@ if __name__ == '__main__':
         print('Image type:', demo_type, 'cache:', use_cache)
 
         # IQ compensations
-        LCI, LCQ = get_lci_lcq_compensation(rcv_sock, rcv_addr, send_sock, send_addr)
+        LCI, LCQ = get_lci_lcq_compensation(usrpSock)
 
         # Tell the server whether we will use cached one
         clientSock.send(int(use_cache).to_bytes(length=4, byteorder='big', signed=False))
@@ -89,17 +88,10 @@ if __name__ == '__main__':
             receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/constellations.npz')
             constellations = np.load(f'{TEMP_DIRECTORY}/constellations.npz')['constellations']
 
-        # Send/receive constellations CONCURRENTLY (to USRP)
-        manager = multiprocessing.Manager()
-        ret_dict = manager.dict()
-        p = multiprocessing.Process(target=rcv_worker, args=(rcv_sock, ret_dict))
-        p.start()
-        time.sleep(1)
+        # Send/receive constellations (to USRP)
+        usrpSock.send(constellations.tobytes())
+        data = receive_constellation_tcp(usrpSock)
 
-        send_constellation_udp(constellations.tobytes(), send_sock, send_addr)
-
-        p.join()
-        data = ret_dict['return']
         rcv_iq, raw_i, raw_q = compensate_signal(data, LCI, LCQ)
 
         # Send channel corrupted (I/Q compensated) constellations (=rcv_iq)
@@ -111,7 +103,6 @@ if __name__ == '__main__':
 
         # receive effective SNR
         SNRdB = struct.unpack('!f', clientSock.recv(4))[0]
-        print(f'Effective SNR: {SNRdB:.2f} dB')
 
         # TODO: plot
         fig, ax = plt.subplots(1, 3)
@@ -159,5 +150,8 @@ if __name__ == '__main__':
         ax[2].imshow(image_jpeg)
 
         plt.show()
+        print(f'Effective SNR: {SNRdB:.2f} dB')
+        time.sleep(0.1)
+
 
 # %%
