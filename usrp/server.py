@@ -49,6 +49,7 @@ if not os.path.exists(TEMP_DIRECTORY):
 
 # Server thing
 serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+serverSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 serverSock.bind(('0.0.0.0', 8080))
 print('Listening')
 serverSock.listen(1)
@@ -60,73 +61,74 @@ while True:
   try:
     print(f'Connection: {str(addr)}')
 
-    # Whether to receive image or not
-    use_cache = bool(int.from_bytes(clientSock.recv(4), byteorder='big', signed=False))
-    print('Cache: ', use_cache)
+    while True:
+        # Whether to receive image or not
+        use_cache = bool(int.from_bytes(clientSock.recv(4), byteorder='big', signed=False))
+        print('Cache: ', use_cache)
 
-    if use_cache:
-      constellations = np.load(f'cifar_constellations.npz')['constellations']
-      data = constellations[PILOT_SIZE:-PILOT_SIZE].byteswap()
-      i = np.right_shift(np.left_shift(data, 16), 16).astype('>f4')
-      q = np.right_shift(data, 16).astype('>f4')
-    else:
-      # Receive image
-      receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/cam_received.png')
-      images = pilimg.open(f'{TEMP_DIRECTORY}/cam_received.png').convert('RGB')
-      plt.imshow(images)
-      plt.show()
+        if use_cache:
+          constellations = np.load(f'cifar_constellations.npz')['constellations']
+          data = constellations[PILOT_SIZE:-PILOT_SIZE].byteswap()
+          i = np.right_shift(np.left_shift(data, 16), 16).astype('>f4')
+          q = np.right_shift(data, 16).astype('>f4')
+        else:
+          # Receive image
+          receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/cam_received.png')
+          images = pilimg.open(f'{TEMP_DIRECTORY}/cam_received.png').convert('RGB')
+          plt.imshow(images)
+          plt.show()
 
-      # Encode image
-      images = tf.convert_to_tensor(np.array(images), dtype=tf.float32) / 255.0
-      h, w, c = images.shape
-      images = tf.reshape(images, (1, h, w, c))
+          # Encode image
+          images = tf.convert_to_tensor(np.array(images), dtype=tf.float32) / 255.0
+          h, w, c = images.shape
+          images = tf.reshape(images, (1, h, w, c))
 
-      images = tf.image.extract_patches(
-          images,
-          sizes=[1, 32, 32, 1],
-          strides=[1, 32, 32, 1],
-          rates=[1, 1, 1, 1],
-          padding='VALID'
-      )
-      images = tf.reshape(images, (-1, 32, 32, c))
+          images = tf.image.extract_patches(
+              images,
+              sizes=[1, 32, 32, 1],
+              strides=[1, 32, 32, 1],
+              rates=[1, 1, 1, 1],
+              padding='VALID'
+          )
+          images = tf.reshape(images, (-1, 32, 32, c))
 
-      data = encoder_network(images)
-      i = data[:,:,0].numpy().flatten()
-      q = data[:,:,1].numpy().flatten()
-      i = np.clip(i / NORMALIZE_CONSTANT * 32767, -32767, 32767)
-      q = np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)
-      constellations = to_constellation_array(i, q, i_pilot=True, q_pilot=True)
+          data = encoder_network(images)
+          i = data[:,:,0].numpy().flatten()
+          q = data[:,:,1].numpy().flatten()
+          i = np.clip(i / NORMALIZE_CONSTANT * 32767, -32767, 32767)
+          q = np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)
+          constellations = to_constellation_array(i, q, i_pilot=True, q_pilot=True)
 
-      # Send constellations
-      np.savez_compressed(f'{TEMP_DIRECTORY}/constellations.npz', constellations=constellations)
-      send_binary(clientSock, f'{TEMP_DIRECTORY}/constellations.npz')
+          # Send constellations
+          np.savez_compressed(f'{TEMP_DIRECTORY}/constellations.npz', constellations=constellations)
+          send_binary(clientSock, f'{TEMP_DIRECTORY}/constellations.npz')
 
-    # Receive rcv_iq.npz file and decode
-    receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/rcv_iq.npz')
-    rcv_iq = np.load(f'{TEMP_DIRECTORY}/rcv_iq.npz')['rcv_iq']
-    rcv_i = np.right_shift(np.left_shift(rcv_iq, 16), 16).astype('>f4') * NORMALIZE_CONSTANT / 32767
-    rcv_q = np.right_shift(rcv_iq, 16).astype('>f4') * NORMALIZE_CONSTANT / 32767
-    
-    rcv_iq = np.zeros((len(rcv_i), 2), dtype=np.float32)
-    rcv_iq[:, 0] = rcv_i
-    rcv_iq[:, 1] = rcv_q
+        # Receive rcv_iq.npz file and decode
+        receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/rcv_iq.npz')
+        rcv_iq = np.load(f'{TEMP_DIRECTORY}/rcv_iq.npz')['rcv_iq']
+        rcv_i = np.right_shift(np.left_shift(rcv_iq, 16), 16).astype('>f4') * NORMALIZE_CONSTANT / 32767
+        rcv_q = np.right_shift(rcv_iq, 16).astype('>f4') * NORMALIZE_CONSTANT / 32767
+        
+        rcv_iq = np.zeros((len(rcv_i), 2), dtype=np.float32)
+        rcv_iq[:, 0] = rcv_i
+        rcv_iq[:, 1] = rcv_q
 
-    # Decode constellations
-    rcv_iq = tf.cast(tf.convert_to_tensor(rcv_iq), tf.float32)
-    rcv_iq = tf.reshape(rcv_iq, (BATCH_SIZE, -1, 2))
-    proposed_result = decoder_network(rcv_iq)
-    tf.keras.utils.save_img(f'{TEMP_DIRECTORY}/decoded_image.png', imBatchtoImage(proposed_result))
+        # Decode constellations
+        rcv_iq = tf.cast(tf.convert_to_tensor(rcv_iq), tf.float32)
+        rcv_iq = tf.reshape(rcv_iq, (BATCH_SIZE, -1, 2))
+        proposed_result = decoder_network(rcv_iq)
+        tf.keras.utils.save_img(f'{TEMP_DIRECTORY}/decoded_image.png', imBatchtoImage(proposed_result))
 
-    # Send image
-    send_binary(clientSock, f'{TEMP_DIRECTORY}/decoded_image.png')
+        # Send image
+        send_binary(clientSock, f'{TEMP_DIRECTORY}/decoded_image.png')
 
-    # Send effective SNR
-    i = i / 32767 * NORMALIZE_CONSTANT
-    q = q / 32767 * NORMALIZE_CONSTANT
-    noise_power = (rcv_i - i) ** 2 + (rcv_q - q) ** 2
-    signal_power = i ** 2 + q ** 2
-    effective_snr = 10 * math.log10(tf.reduce_mean(signal_power / (0.001 + noise_power)))
-    clientSock.send(struct.pack('!f', effective_snr))
+        # Send effective SNR
+        i = i / 32767 * NORMALIZE_CONSTANT
+        q = q / 32767 * NORMALIZE_CONSTANT
+        noise_power = (rcv_i - i) ** 2 + (rcv_q - q) ** 2
+        signal_power = i ** 2 + q ** 2
+        effective_snr = 10 * math.log10(tf.reduce_mean(signal_power / (0.001 + noise_power)))
+        clientSock.send(struct.pack('!f', effective_snr))
 
   except Exception as e:
     print('Error:', e)
