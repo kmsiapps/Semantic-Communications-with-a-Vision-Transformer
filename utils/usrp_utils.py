@@ -1,13 +1,11 @@
 import numpy as np
 import struct
 
-import multiprocessing
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 from usrp.pilot import p_start_i, p_end_i, p_start_q, p_end_q, PILOT_SIZE, SAMPLE_SIZE
 from utils.networking import *
-from config.usrp_config import NORMALIZE_CONSTANT
 
 EXPECTED_SAMPLE_SIZE = SAMPLE_SIZE - PILOT_SIZE * 2
 
@@ -17,7 +15,7 @@ def to_constellation_array(i, q, i_pilot=True, q_pilot=True):
   i_end_pilot = p_end_i if i_pilot else np.zeros(len(p_end_i))
   q_start_pilot = p_start_q if q_pilot else np.zeros(len(p_start_q))
   q_end_pilot = p_end_q if q_pilot else np.zeros(len(p_end_q))
-  
+
   p_i = np.concatenate([i_start_pilot, i, i_end_pilot]).astype(np.int16)
   p_q = np.concatenate([q_start_pilot, q, q_end_pilot]).astype(np.int32)
 
@@ -91,15 +89,13 @@ def compensate_signal(data, LCI, LCQ):
   raw_i = np.array(d_iq[:array_length // 2])
   raw_q = np.array(d_iq[array_length // 2:])
 
-  raw_i -= np.mean(raw_i)
-  raw_q -= np.mean(raw_q)
-
   # Leakage compensation
   i_compensated = (LCI * raw_q - raw_i) / (LCI*LCQ-1)
   q_compensated = (LCQ * raw_i - raw_q) / (LCQ*LCI-1) # / 3.5 # magic num
 
   pilot_mask_i = np.concatenate([p_start_i, np.zeros(EXPECTED_SAMPLE_SIZE), p_end_i])
-  start_idx = np.argmax(np.abs(np.correlate(i_compensated, pilot_mask_i))) + PILOT_SIZE
+  pilot_mask_q = np.concatenate([p_start_q, np.zeros(EXPECTED_SAMPLE_SIZE), p_end_q])
+  start_idx = np.argmax(np.correlate(i_compensated, pilot_mask_i) + np.abs(np.correlate(q_compensated, pilot_mask_q))) + PILOT_SIZE
 
   # get noise & zero-mean normalize
   noises = np.concatenate(
@@ -108,7 +104,6 @@ def compensate_signal(data, LCI, LCQ):
   )
   n = np.mean(noises)
   i_compensated -= n
-  noise_power_i = np.sum(noises ** 2) / len(noises)
 
   # get average h
   p_start_rx = i_compensated[(start_idx - PILOT_SIZE):start_idx]
@@ -122,15 +117,6 @@ def compensate_signal(data, LCI, LCQ):
 
   # get data
   ihat = i_compensated[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]
-  signal_power = np.sum((ihat * hi) ** 2) / len(ihat)
-
-  # plt.title('Decoded In-phase signal\n(h & n compensated)')
-  # plt.plot(ihat)
-  # plt.show()
-
-  # Quadrature phase detection =================
-  pilot_mask = np.concatenate([p_start_q, np.zeros(EXPECTED_SAMPLE_SIZE), p_end_q])
-  start_idx = np.argmax(np.abs(np.correlate(q_compensated, pilot_mask))) + PILOT_SIZE
 
   # get noise & zero-mean normalize
   noises = np.concatenate(
@@ -139,7 +125,6 @@ def compensate_signal(data, LCI, LCQ):
   )
   n = np.mean(noises)
   q_compensated -= n
-  noise_power_q = np.sum(noises ** 2) / len(noises)
 
   # get average h
   p_start_rx = q_compensated[(start_idx - PILOT_SIZE):start_idx]
@@ -154,12 +139,9 @@ def compensate_signal(data, LCI, LCQ):
   # get data
   qhat = q_compensated[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]
 
-  # plt.title('Decoded Quadrature-phase signal\n(h & n compensated)')
-  # plt.plot(qhat)
-  # plt.show()
-
   ihat = np.clip((ihat * 32767).astype(np.int32), -32767, 32767)
   qhat = np.clip((qhat * 32767).astype(np.int32), -32767, 32767)
+
   rcv_iq = to_constellation_array(ihat, qhat, i_pilot=False, q_pilot=False)[PILOT_SIZE:-PILOT_SIZE].byteswap()
 
   return rcv_iq, raw_i, raw_q

@@ -39,12 +39,16 @@ def send_binary(sock, filename):
     sock.send(data)
 
 
-def receive_constellation_tcp(rcv_sock):
+def receive_constellation_tcp(rcv_sock, total_bytes=None):
   rcv_data = bytes()
   _data = bytes()
-  ARRAY_END = 2 * SOCK_BUFF_SIZE # some initial value
-  read_header = False
-  with tqdm(initial=0, total=100) as progress:
+  if not total_bytes:
+    ARRAY_END = 2 * SOCK_BUFF_SIZE # some initial value
+    read_header = False
+  else:
+    ARRAY_END = total_bytes
+    read_header = True
+  with tqdm(initial=0, total=ARRAY_END) as progress:
     while True:
       rcv = True
       try:
@@ -58,11 +62,17 @@ def receive_constellation_tcp(rcv_sock):
           read_header = True
           progress.reset(total=ARRAY_END)
           progress.update(len(_data))
+
         rcv_data += _data
         progress.update(len(_data))
         
         if len(rcv_data) >= ARRAY_END:
-          data = rcv_data[METADATA_BYTES:ARRAY_END]
           break
+  
+  if total_bytes:
+    # No size information in the front
+    data = rcv_data
+  else:
+    data = rcv_data[METADATA_BYTES:ARRAY_END]
   return data
 

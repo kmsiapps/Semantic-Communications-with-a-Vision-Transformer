@@ -23,7 +23,7 @@ from usrp.pilot import PILOT_SIZE
 
 ARCH = 'CCVVCC'
 NUM_SYMBOLS = 512
-CKPT_NAME = '../bkup_ckpt/best/awgn/CCVVCC_512_10dB_599'
+CKPT_NAME = '../ckpt/CCVVCC_512_10dB_599'
 TARGET_JPEG_RATE = 2048
 
 encoder_network = SemViT_Encoder_Only(
@@ -96,7 +96,7 @@ while True:
           i = data[:,:,0].numpy().flatten()
           q = data[:,:,1].numpy().flatten()
           i = np.clip(i / NORMALIZE_CONSTANT * 32767, -32767, 32767)
-          q = np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)
+          q = np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)         
           constellations = to_constellation_array(i, q, i_pilot=True, q_pilot=True)
 
           # Send constellations
@@ -106,8 +106,8 @@ while True:
         # Receive rcv_iq.npz file and decode
         receive_and_save_binary(clientSock, f'{TEMP_DIRECTORY}/rcv_iq.npz')
         rcv_iq = np.load(f'{TEMP_DIRECTORY}/rcv_iq.npz')['rcv_iq']
-        rcv_i = np.right_shift(np.left_shift(rcv_iq, 16), 16).astype('>f4') * NORMALIZE_CONSTANT / 32767
-        rcv_q = np.right_shift(rcv_iq, 16).astype('>f4') * NORMALIZE_CONSTANT / 32767
+        rcv_i = np.right_shift(np.left_shift(rcv_iq, 16), 16).astype('>f4') / 32767 * NORMALIZE_CONSTANT
+        rcv_q = np.right_shift(rcv_iq, 16).astype('>f4') / 32767 * NORMALIZE_CONSTANT
         
         rcv_iq = np.zeros((len(rcv_i), 2), dtype=np.float32)
         rcv_iq[:, 0] = rcv_i
@@ -125,6 +125,7 @@ while True:
         # Send effective SNR
         i = i / 32767 * NORMALIZE_CONSTANT
         q = q / 32767 * NORMALIZE_CONSTANT
+
         noise_power = (rcv_i - i) ** 2 + (rcv_q - q) ** 2
         signal_power = i ** 2 + q ** 2
         effective_snr = 10 * math.log10(tf.reduce_mean(signal_power / (0.001 + noise_power)))
