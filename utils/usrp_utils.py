@@ -95,7 +95,7 @@ def compensate_signal(data, LCI, LCQ):
 
   pilot_mask_i = np.concatenate([p_start_i, np.zeros(EXPECTED_SAMPLE_SIZE), p_end_i])
   pilot_mask_q = np.concatenate([p_start_q, np.zeros(EXPECTED_SAMPLE_SIZE), p_end_q])
-  start_idx = np.argmax(np.correlate(i_compensated, pilot_mask_i) + np.abs(np.correlate(q_compensated, pilot_mask_q))) + PILOT_SIZE
+  start_idx = np.argmax(np.abs(np.correlate(i_compensated, pilot_mask_i)) + np.abs(np.correlate(q_compensated, pilot_mask_q))) + PILOT_SIZE
 
   # get noise & zero-mean normalize
   noises = np.concatenate(
