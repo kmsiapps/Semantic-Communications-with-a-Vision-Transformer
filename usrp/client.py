@@ -12,7 +12,7 @@ import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from utils.networking import receive_and_save_binary, send_binary
 from utils.usrp_utils import get_lci_lcq_compensation, compensate_signal, receive_constellation_tcp
-from config.usrp_config import USRP_HOST, USRP_PORT, RCV_ADDR, RCV_PORT, TEMP_DIRECTORY
+from config.usrp_config import SERVER_HOST, SERVER_PORT, CLIENT_ADDR, CLIENT_PORT, TEMP_DIRECTORY
 
 TARGET_JPEG_RATE = 2048
 # Our encoder produces 512 constellations per 32 x 32 patch
@@ -28,12 +28,12 @@ if __name__ == '__main__':
     if not os.path.exists(TEMP_DIRECTORY):
         os.makedirs(TEMP_DIRECTORY)
     clientSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    clientSock.connect(('1.233.219.33', 8080))
+    clientSock.connect((SERVER_HOST, SERVER_PORT))
     print('Connected to server')
     
     serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serverSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    serverSock.bind((RCV_ADDR, RCV_PORT))
+    serverSock.bind((CLIENT_ADDR, CLIENT_PORT))
     serverSock.listen(1)
     print('Waiting')
     usrpSock, addr = serverSock.accept()
