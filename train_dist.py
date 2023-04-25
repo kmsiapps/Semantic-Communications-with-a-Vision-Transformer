@@ -4,7 +4,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
 
 import tensorflow as tf
-from tensorflow.python.keras.callbacks import TensorBoard
 import argparse
 
 from models.model import SemViT
@@ -42,7 +41,7 @@ def main(args):
   
   model.compile(
       loss='mse',
-      optimizer=tf.keras.optimizers.Adam(
+      optimizer=tf.keras.optimizers.legacy.Adam(
           learning_rate=1e-4
       ),
       metrics=[
@@ -68,7 +67,7 @@ def main(args):
       )
   ]
 
-  tensorboard = TensorBoard(log_dir=f'logs/{EXPERIMENT_NAME}')
+  tensorboard = tf.keras.callbacks.TensorBoard(log_dir=f'logs/{EXPERIMENT_NAME}')
   history = model.fit(
       train_ds,
       initial_epoch=args.initial_epoch,
