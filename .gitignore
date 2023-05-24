@@ -12,3 +12,4 @@ usrp/temp
 usrp/*.png
 usrp/*.npz
 checkpoint
+analysis/temp/
