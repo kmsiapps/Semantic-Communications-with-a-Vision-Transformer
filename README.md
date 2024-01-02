@@ -1,6 +1,17 @@
-# On the Role of ViT and CNN on Semantic Communications
+# On the Role of ViT and CNN in Semantic Communications: Analysis and Prototype Validation
 
-Code repository for the paper "On the Role of ViT and CNN on Semantic Communications".
+Code repository for the paper [On the Role of ViT and CNN in Semantic Communications: Analysis and Prototype Validation](https://ieeexplore.ieee.org/document/10171356).
+```
+@ARTICLE{10171356,
+  author={Yoo, Hanju and Dai, Linglong and Kim, Songkuk and Chae, Chan-Byoung},
+  journal={IEEE Access}, 
+  title={On the Role of ViT and CNN in Semantic Communications: Analysis and Prototype Validation}, 
+  year={2023},
+  volume={11},
+  number={},
+  pages={71528-71541},
+  doi={10.1109/ACCESS.2023.3291405}}
+```
 
 ### Directories
 - `analysis/`: Codes for various analysis, e.g., # parameters, cosine similarity, or Fourier analysis, as presented in the paper.
