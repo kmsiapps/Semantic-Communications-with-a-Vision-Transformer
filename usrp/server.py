@@ -23,7 +23,7 @@ from usrp.pilot import PILOT_SIZE
 
 ARCH = 'CCVVCC'
 NUM_SYMBOLS = 512
-CKPT_NAME = '../ckpt/CCVVCC_512_10dB_599'
+CKPT_NAME = '../bkup_ckpt/best/awgn/CCVVCC_512_10dB_599'
 TARGET_JPEG_RATE = 2048
 
 encoder_network = SemViT_Encoder_Only(
@@ -95,8 +95,8 @@ while True:
           data = encoder_network(images)
           i = data[:,:,0].numpy().flatten()
           q = data[:,:,1].numpy().flatten()
-          i = np.clip(i / NORMALIZE_CONSTANT * 32767, -32767, 32767)
-          q = np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767)         
+          i = np.round(np.clip(i / NORMALIZE_CONSTANT * 32767, -32767, 32767))
+          q = np.round(np.clip(q / NORMALIZE_CONSTANT * 32767, -32767, 32767))         
           constellations = to_constellation_array(i, q, i_pilot=True, q_pilot=True)
 
           # Send constellations

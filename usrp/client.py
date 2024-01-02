@@ -11,7 +11,7 @@ from skimage.metrics import structural_similarity, peak_signal_noise_ratio
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from utils.networking import receive_and_save_binary, send_binary
-from utils.usrp_utils import get_lci_lcq_compensation, compensate_signal, receive_constellation_tcp
+from utils.usrp_utils import compensate_signal, receive_constellation_tcp
 from config.usrp_config import SERVER_HOST, SERVER_PORT, CLIENT_ADDR, CLIENT_PORT, TEMP_DIRECTORY
 
 TARGET_JPEG_RATE = 2048
@@ -72,9 +72,6 @@ if __name__ == '__main__':
 
         print('Image type:', demo_type, 'cache:', use_cache)
 
-        # IQ compensations
-        LCI, LCQ = get_lci_lcq_compensation(usrpSock)
-
         # Tell the server whether we will use cached one
         clientSock.send(int(use_cache).to_bytes(length=4, byteorder='big', signed=False))
 
@@ -92,7 +89,7 @@ if __name__ == '__main__':
         usrpSock.send(constellations.tobytes())
         data = receive_constellation_tcp(usrpSock)
 
-        rcv_iq, raw_i, raw_q = compensate_signal(data, LCI, LCQ)
+        rcv_iq, raw_i, raw_q = compensate_signal(data)
 
         # Send channel corrupted (I/Q compensated) constellations (=rcv_iq)
         np.savez_compressed(f'{TEMP_DIRECTORY}/snd_iq.npz', rcv_iq=rcv_iq)

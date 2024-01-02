@@ -27,47 +27,7 @@ def to_constellation_array(i, q, i_pilot=True, q_pilot=True):
   return data
 
 
-def get_lci_lcq_compensation(clientSock):
-	# Get leakage compensation constant
-	# Leakage model: 
-	# ihat = LCI * q + i
-	# qhat = LCQ * i + q
-
-  # Send LCI message
-  x = np.linspace(0, 4 * 2 * np.pi, SAMPLE_SIZE - 2*PILOT_SIZE)
-  i = 0 * np.cos(x) * 32767
-  q = 1 * np.sin(x) * 32767
-
-  data = to_constellation_array(i, q, i_pilot=False, q_pilot=True)
-  send_data = data.tobytes()
-  
-  clientSock.send(send_data)
-  data = receive_constellation_tcp(clientSock)
-  print('LCI set.')
-
-  array_length = len(data) // 4
-  d_iq = struct.unpack('!' + 'f' * array_length, data)
-
-  raw_i = np.array(d_iq[:array_length // 2])
-  raw_q = np.array(d_iq[array_length // 2:])
-
-  pilot_mask_q = np.concatenate([p_start_q, np.zeros(EXPECTED_SAMPLE_SIZE), p_end_q])
-  start_idx = np.argmax(np.abs(np.correlate(raw_q, pilot_mask_q))) + PILOT_SIZE
-  # get noise & zero-mean normalize
-  LCI = np.mean(raw_i[start_idx:start_idx+EXPECTED_SAMPLE_SIZE] / (raw_q[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]+0.0001))
-
-  # Send LCQ message
-  x = np.linspace(0, (4 * 2) * np.pi, SAMPLE_SIZE - 2*PILOT_SIZE)
-  i = 1 * np.cos(x) * 32767
-  q = 0 * np.sin(x) * 32767
-
-  data = to_constellation_array(i, q, i_pilot=True, q_pilot=False)
-  send_data = data.tobytes()
-
-  clientSock.send(send_data)
-  data = receive_constellation_tcp(clientSock)
-  print('LCQ set.')
-
+def compensate_signal(data):
   array_length = len(data) // 4
   d_iq = struct.unpack('!' + 'f' * array_length, data)
 
@@ -75,69 +35,47 @@ def get_lci_lcq_compensation(clientSock):
   raw_q = np.array(d_iq[array_length // 2:])
 
   pilot_mask_i = np.concatenate([p_start_i, np.zeros(EXPECTED_SAMPLE_SIZE), p_end_i])
-  start_idx = np.argmax(np.abs(np.correlate(raw_i, pilot_mask_i))) + PILOT_SIZE
-
-  # get noise & zero-mean normalize
-  LCQ = np.mean(raw_q[start_idx:start_idx+EXPECTED_SAMPLE_SIZE] / (raw_i[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]+0.0001))
-  return LCI, LCQ
-
-
-def compensate_signal(data, LCI, LCQ):
-  array_length = len(data) // 4
-  d_iq = struct.unpack('!' + 'f' * array_length, data)
-
-  raw_i = np.array(d_iq[:array_length // 2])
-  raw_q = np.array(d_iq[array_length // 2:])
-
-  # Leakage compensation
-  i_compensated = (LCI * raw_q - raw_i) / (LCI*LCQ-1)
-  q_compensated = (LCQ * raw_i - raw_q) / (LCQ*LCI-1) # / 3.5 # magic num
-
-  pilot_mask_i = np.concatenate([p_start_i, np.zeros(EXPECTED_SAMPLE_SIZE), p_end_i])
   pilot_mask_q = np.concatenate([p_start_q, np.zeros(EXPECTED_SAMPLE_SIZE), p_end_q])
-  start_idx = np.argmax(np.abs(np.correlate(i_compensated, pilot_mask_i)) + np.abs(np.correlate(q_compensated, pilot_mask_q))) + PILOT_SIZE
+  start_idx = np.argmax(np.abs(np.correlate(raw_i, pilot_mask_i)) + np.abs(np.correlate(raw_q, pilot_mask_q))) + PILOT_SIZE
+
+  iq = raw_i + 1j*raw_q
 
   # get noise & zero-mean normalize
   noises = np.concatenate(
-    [i_compensated[:start_idx-PILOT_SIZE],
-    i_compensated[start_idx+EXPECTED_SAMPLE_SIZE+PILOT_SIZE:]]
+  [iq[:start_idx-PILOT_SIZE],
+  iq[start_idx+EXPECTED_SAMPLE_SIZE+PILOT_SIZE:]]
   )
   n = np.mean(noises)
-  i_compensated -= n
+  iq -= n
 
-  # get average h
-  p_start_rx = i_compensated[(start_idx - PILOT_SIZE):start_idx]
-  p_end_rx = i_compensated[(start_idx + EXPECTED_SAMPLE_SIZE):(start_idx + EXPECTED_SAMPLE_SIZE + PILOT_SIZE)]
+  # channel compensation
+  p_start_rx = iq[(start_idx - PILOT_SIZE):start_idx]
+  p_end_rx = iq[(start_idx + EXPECTED_SAMPLE_SIZE):(start_idx + EXPECTED_SAMPLE_SIZE + PILOT_SIZE)]
   p_rx = np.concatenate([p_start_rx, p_end_rx])
-  p = np.concatenate([p_start_i, p_end_i]) / 32767
-  nonzero_idx = np.where(p != 0)
-  hi = np.sum(np.divide(p_rx[nonzero_idx], p[nonzero_idx])) / len(p[nonzero_idx])
 
-  i_compensated /= hi
+  p_i = np.concatenate([p_start_i, p_end_i]) / 32767
+  p_q = np.concatenate([p_start_q, p_end_q]) / 32767
+  p_gt = p_i + 1j*p_q
 
-  # get data
-  ihat = i_compensated[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]
+  # get average h_amp
+  p_amp_rx = np.sqrt(np.real(p_rx) ** 2 + np.imag(p_rx) ** 2)
+  p_amp = np.sqrt(np.real(p_gt) ** 2 + np.imag(p_gt) ** 2)
+  nonzero_idx = np.where(np.real(p_amp) != 0)
+  h_amp = np.mean(np.divide(p_amp_rx[nonzero_idx], p_amp[nonzero_idx])) / 0.5 * 0.6 # magic num
 
-  # get noise & zero-mean normalize
-  noises = np.concatenate(
-    [q_compensated[:start_idx-PILOT_SIZE],
-    q_compensated[start_idx+EXPECTED_SAMPLE_SIZE+PILOT_SIZE:]]
-  )
-  n = np.mean(noises)
-  q_compensated -= n
+  # get average h_phase
+  nonzero_idx = np.where(np.real(p_gt) != 0)
+  p_phase_rx = np.angle(p_rx[nonzero_idx])
+  p_phase_gt = np.angle(p_gt[nonzero_idx])
+  p_phase_diff = p_phase_rx - p_phase_gt
+  p_phase_diff = np.mean(np.arctan2(np.sin(p_phase_diff), np.cos(p_phase_diff))) # normalize to (-pi, pi)
 
-  # get average h
-  p_start_rx = q_compensated[(start_idx - PILOT_SIZE):start_idx]
-  p_end_rx = q_compensated[(start_idx + EXPECTED_SAMPLE_SIZE):(start_idx + EXPECTED_SAMPLE_SIZE + PILOT_SIZE)]
-  p_rx = np.concatenate([p_start_rx, p_end_rx])
-  p = np.concatenate([p_start_q, p_end_q]) / 32767
-  nonzero_idx = np.where(p != 0)
-  hq = np.sum(np.divide(p_rx[nonzero_idx], p[nonzero_idx])) / len(p[nonzero_idx])
+  # compensate signal    
+  iq /= h_amp  
+  iq *= np.exp(-1j*p_phase_diff)
 
-  q_compensated /= hq
-
-  # get data
-  qhat = q_compensated[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]
+  ihat = np.real(iq)[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]
+  qhat = np.imag(iq)[start_idx:start_idx+EXPECTED_SAMPLE_SIZE]
 
   ihat = np.clip((ihat * 32767).astype(np.int32), -32767, 32767)
   qhat = np.clip((qhat * 32767).astype(np.int32), -32767, 32767)
