@@ -40,13 +40,13 @@ def compensate_signal(data):
 
   iq = raw_i + 1j*raw_q
 
-  # get noise & zero-mean normalize
-  noises = np.concatenate(
-  [iq[:start_idx-PILOT_SIZE],
-  iq[start_idx+EXPECTED_SAMPLE_SIZE+PILOT_SIZE:]]
-  )
-  n = np.mean(noises)
-  iq -= n
+  # # get noise & zero-mean normalize
+  # noises = np.concatenate(
+  # [iq[:start_idx-PILOT_SIZE],
+  # iq[start_idx+EXPECTED_SAMPLE_SIZE+PILOT_SIZE:]]
+  # )
+  # n = np.mean(noises)
+  # iq -= n
 
   # channel compensation
   p_start_rx = iq[(start_idx - PILOT_SIZE):start_idx]
