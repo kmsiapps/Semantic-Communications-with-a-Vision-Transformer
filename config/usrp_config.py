@@ -8,7 +8,7 @@ SERVER_PORT = 8080
 # Server address and port
 # Server conducts encode/decode functions of the given images/constellations with its GPU.
 
-NORMALIZE_CONSTANT = 10
+NORMALIZE_CONSTANT = 8
 # note: inversely proportional to signal power
 
 TEMP_DIRECTORY = './temp'

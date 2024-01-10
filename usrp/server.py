@@ -128,7 +128,7 @@ while True:
 
         noise_power = (rcv_i - i) ** 2 + (rcv_q - q) ** 2
         signal_power = i ** 2 + q ** 2
-        effective_snr = 10 * math.log10(tf.reduce_mean(signal_power / (0.001 + noise_power)))
+        effective_snr = 10 * math.log10(tf.reduce_mean(signal_power) / tf.reduce_mean(0.001 + noise_power))
         clientSock.send(struct.pack('!f', effective_snr))
 
   except Exception as e:
