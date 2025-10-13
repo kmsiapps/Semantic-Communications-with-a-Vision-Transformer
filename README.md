@@ -13,6 +13,11 @@ Code repository for the paper [On the Role of ViT and CNN in Semantic Communicat
   doi={10.1109/ACCESS.2023.3291405}}
 ```
 
+### ✨ Update
+If you're interested in, check our new [OFDM-MIMO semantic testbed](https://github.com/kmsiapps/semantic-mimo-ofdm) repository.
+
+---
+
 ### Directories
 - `analysis/`: Codes for various analysis, e.g., # parameters, cosine similarity, or Fourier analysis, as presented in the paper.
 - `models/`: Tensorflow implementations of the proposed model (and also the baseline).
